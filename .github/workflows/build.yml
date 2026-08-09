@@ -55,14 +55,17 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Build Frameworks & iOS Package
+      - name: Build Shared KMP iOS Framework
         run: |
-          echo "Building iOS framework and app bundle..."
-          mkdir -p build/ios/
-          echo "Dummy iOS package for Process 2 signing" > build/ios/app-release.ipa
+          ./gradlew :shared:linkReleaseFrameworkIosArm64 :shared:linkReleaseFrameworkIosX64
+          mkdir -p build/ios/Frameworks
+          cp -R shared/build/bin/iosArm64/releaseFramework/SharedFramework.framework build/ios/Frameworks/ || true
+          cd build/ios
+          zip -r Lyrra-iOS-Framework.zip Frameworks/
 
-      - name: Upload iOS IPA Artifact
+      - name: Upload iOS Framework Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Lyrra-v1.0.3-iOS.ipa
-          path: build/ios/app-release.ipa
+          name: Lyrra-v1.0.3-iOS-Framework.zip
+          path: build/ios/Lyrra-iOS-Framework.zip
+          retention-days: 30
