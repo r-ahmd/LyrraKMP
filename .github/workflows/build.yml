@@ -80,3 +80,17 @@ jobs:
           name: Lyrra-v1.0.3-iOS.ipa
           path: build/ios/Lyrra-v1.0.3-iOS.ipa
           retention-days: 30
+
+  deploy-pwa:
+    name: Deploy Lyrra PWA to GitHub Pages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Upload PWA Web Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Lyrra-PWA-Web
+          path: web_pwa/
+          retention-days: 30
