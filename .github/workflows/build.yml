@@ -28,10 +28,6 @@ jobs:
           key: gradle-${{ hashFiles('**/*.gradle.kts', '**/gradle-wrapper.properties') }}
           restore-keys: gradle-
 
-      - name: Decode Keystore
-        run: |
-          printf '%s' "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > ${{ github.workspace }}/my-upload-key.jks
-
       - name: Build Android Release APK
         env:
           KEYSTORE_PATH: ${{ github.workspace }}/my-upload-key.jks
