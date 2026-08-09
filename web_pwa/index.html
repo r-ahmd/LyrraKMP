@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Lyrra - Listen Together</title>
+  <title>Lyrra Music Player</title>
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="styles.css">
   <meta name="theme-color" content="#8B5CF6">
@@ -14,64 +14,109 @@
 </head>
 <body>
 
-  <div class="container">
-    <div class="header">
-      <h1>Lyrra</h1>
-      <p>Listen Together & Real-Time Sync</p>
-    </div>
+  <div class="app-container">
+    <!-- Top Header -->
+    <header class="app-header">
+      <div class="brand">
+        <span class="logo-icon">⚡</span>
+        <span class="brand-title">Lyrra</span>
+      </div>
+      <div class="status-badge" id="status-badge">
+        <div class="status-dot" id="status-dot"></div>
+        <span id="status-text">Solo</span>
+      </div>
+    </header>
 
-    <!-- PWA Install instructions banner for iOS -->
+    <!-- iOS Install Banner -->
     <div id="ios-pwa-prompt" class="pwa-banner hidden">
-      💡 Tap <strong>Share</strong> icon in Safari & Select <strong>Add to Home Screen</strong> to install Lyrra!
+      💡 Tap <strong>Share</strong> in Safari & select <strong>Add to Home Screen</strong> to install!
     </div>
 
-    <!-- Connection Status -->
-    <div class="status-badge" id="status-badge">
-      <div class="status-dot" id="status-dot"></div>
-      <span id="status-text">Disconnected</span>
-    </div>
+    <!-- Main Content Area -->
+    <main class="main-content">
 
-    <!-- Mode Selection Screen -->
-    <div id="screen-setup" class="card-section">
-      <div class="section-title">Listen with Friends</div>
-      
-      <button class="btn btn-primary" id="btn-create-room">
-        ⚡ Create Room (Host)
-      </button>
-
-      <div style="text-align: center; color: var(--text-sub); font-size: 0.8rem; margin: 4px 0;">OR</div>
-
-      <div class="input-group">
-        <input type="text" id="input-room-code" placeholder="ROOM CODE" maxlength="6">
-        <button class="btn btn-secondary" id="btn-join-room" style="width: auto; padding: 12px 20px;">Join</button>
-      </div>
-    </div>
-
-    <!-- Active Room Screen -->
-    <div id="screen-room" class="card-section hidden">
-      <div class="section-title" id="room-role-title">Active Session</div>
-      
-      <div class="room-display" id="display-room-code">------</div>
-
-      <div class="player-card">
-        <div class="album-art" style="display:flex; align-items:center; justify-content:center; font-size:3rem; background:rgba(255,255,255,0.05);">🎵</div>
-        <div class="track-info">
-          <div class="track-title" id="track-title">Waiting for playback...</div>
-          <div class="track-artist" id="track-artist">Host controls the queue</div>
+      <!-- TAB 1: HOME / EXPLORE -->
+      <section id="tab-home" class="tab-page">
+        <h2 class="page-title">Trending & Popular</h2>
+        <div class="music-grid" id="home-grid">
+          <!-- Populated by JS -->
         </div>
-      </div>
+      </section>
 
-      <div class="controls hidden" id="host-controls">
-        <button class="btn btn-secondary btn-circle" id="btn-prev">⏮</button>
-        <button class="btn btn-primary btn-circle" id="btn-play-pause">▶</button>
-        <button class="btn btn-secondary btn-circle" id="btn-next">⏭</button>
-      </div>
+      <!-- TAB 2: SEARCH -->
+      <section id="tab-search" class="tab-page hidden">
+        <div class="search-bar-container">
+          <input type="text" id="search-input" placeholder="Search songs, artists, albums...">
+          <button class="btn btn-primary" id="btn-search-trigger">Search</button>
+        </div>
+        <div class="music-list" id="search-results">
+          <div class="empty-state">Search for songs to start listening</div>
+        </div>
+      </section>
 
-      <button class="btn btn-danger" id="btn-leave-room" style="margin-top: 12px;">
-        Leave Session
-      </button>
+      <!-- TAB 3: LISTEN TOGETHER -->
+      <section id="tab-together" class="tab-page hidden">
+        <div class="card-section">
+          <h2 class="page-title">Listen Together</h2>
+          <p class="subtitle">Sync music playback live with friends across Android & iOS!</p>
+
+          <!-- Setup screen -->
+          <div id="together-setup" class="together-box">
+            <button class="btn btn-primary" id="btn-create-room">
+              ⚡ Create Room (Host)
+            </button>
+            <div class="divider">OR</div>
+            <div class="input-group">
+              <input type="text" id="input-room-code" placeholder="6-CHAR CODE" maxlength="6">
+              <button class="btn btn-secondary" id="btn-join-room">Join</button>
+            </div>
+          </div>
+
+          <!-- Active Room info -->
+          <div id="together-active" class="together-box hidden">
+            <div class="room-role-badge" id="room-role-badge">HOST</div>
+            <div class="room-code-display" id="display-room-code">------</div>
+            <p class="subtitle" id="presence-count">1 member connected</p>
+
+            <button class="btn btn-danger" id="btn-leave-room" style="margin-top:12px;">
+              Leave Room
+            </button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Bottom Now Playing Bar -->
+    <div class="now-playing-bar" id="now-playing-bar">
+      <img id="player-art" src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=150" class="player-thumb" alt="Art">
+      <div class="player-details">
+        <div class="player-title" id="player-title">Select a track</div>
+        <div class="player-artist" id="player-artist">Lyrra Player</div>
+      </div>
+      <div class="player-controls">
+        <button class="icon-btn" id="btn-play-pause">▶</button>
+      </div>
     </div>
 
+    <!-- Hidden HTML5 Audio Element -->
+    <audio id="audio-element" preload="auto"></audio>
+
+    <!-- Bottom Navigation Bar -->
+    <nav class="bottom-nav">
+      <button class="nav-item active" data-tab="tab-home">
+        <span class="nav-icon">🔥</span>
+        <span class="nav-label">Home</span>
+      </button>
+      <button class="nav-item" data-tab="tab-search">
+        <span class="nav-icon">🔍</span>
+        <span class="nav-label">Search</span>
+      </button>
+      <button class="nav-item" data-tab="tab-together">
+        <span class="nav-icon">👥</span>
+        <span class="nav-label">Together</span>
+      </button>
+    </nav>
   </div>
 
   <script src="app.js"></script>
