@@ -85,15 +85,49 @@
 
     </main>
 
-    <!-- Bottom Now Playing Bar -->
-    <div class="now-playing-bar" id="now-playing-bar">
+    <!-- Bottom Mini Player Bar -->
+    <div class="now-playing-bar" id="now-playing-bar" onclick="openFullPlayer()">
       <img id="player-art" src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=150" class="player-thumb" alt="Art">
       <div class="player-details">
         <div class="player-title" id="player-title">Select a track</div>
         <div class="player-artist" id="player-artist">Lyrra Player</div>
       </div>
-      <div class="player-controls">
+      <div class="player-controls" onclick="event.stopPropagation()">
         <button class="icon-btn" id="btn-play-pause">▶</button>
+      </div>
+    </div>
+
+    <!-- FULL SCREEN NOW PLAYING MODAL -->
+    <div class="full-player-modal hidden" id="full-player-modal">
+      <div class="full-player-header">
+        <button class="close-btn" onclick="closeFullPlayer()">✕</button>
+        <span class="full-player-tag">NOW PLAYING</span>
+        <div></div>
+      </div>
+
+      <div class="full-player-body">
+        <img id="full-player-art" src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500" class="full-album-art" alt="Album Cover">
+        
+        <div class="full-track-meta">
+          <div class="full-track-title" id="full-track-title">Select a track</div>
+          <div class="full-track-artist" id="full-track-artist">Lyrra Music Player</div>
+        </div>
+
+        <!-- Progress Seek Bar -->
+        <div class="seek-container">
+          <input type="range" id="seek-bar" min="0" max="100" value="0" step="0.1">
+          <div class="time-labels">
+            <span id="time-current">0:00</span>
+            <span id="time-duration">0:00</span>
+          </div>
+        </div>
+
+        <!-- Large Player Controls -->
+        <div class="full-controls">
+          <button class="full-icon-btn" id="btn-prev-track">⏮</button>
+          <button class="full-icon-btn play-main" id="btn-full-play">▶</button>
+          <button class="full-icon-btn" id="btn-next-track">⏭</button>
+        </div>
       </div>
     </div>
 
@@ -122,6 +156,7 @@
     const SUPABASE_KEY = "sb_publishable_enIYe3gEaqUcHp78L-VCFQ_K8G2dWtA";
     let supabaseClient = null;
 
+    let currentTrackIndex = 0;
     let currentTrack = null;
     let isPlaying = false;
     let currentChannel = null;
@@ -135,10 +170,19 @@
       { id: "34Na4j8AVgA", title: "Starboy", artist: "The Weeknd ft. Daft Punk", artwork: "https://i.ytimg.com/vi/34Na4j8AVgA/hqdefault.jpg", audio: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview115/v4/21/df/b5/21dfb5c4-0692-28df-29bb-132d72c1c3ae/mzaf_17296061329618174780.plus.aac.p.m4a" }
     ];
 
-    // Execute immediately so UI is populated without waiting for network/onload!
     function initUI() {
       renderGrid();
       attachEvents();
+    }
+
+    function openFullPlayer() {
+      const modal = document.getElementById("full-player-modal");
+      if (modal) modal.classList.remove("hidden");
+    }
+
+    function closeFullPlayer() {
+      const modal = document.getElementById("full-player-modal");
+      if (modal) modal.classList.add("hidden");
     }
 
     function switchTab(tabId, btnId) {
@@ -167,6 +211,7 @@
         const card = document.getElementById(`card-${idx}`);
         if (card) {
           card.onclick = function() {
+            currentTrackIndex = idx;
             playSong(t.id, t.title, t.artist, t.artwork, t.audio);
           };
         }
@@ -176,19 +221,29 @@
     function playSong(id, title, artist, artwork, audioUrl) {
       currentTrack = { id, title, artist, artwork, audioUrl };
 
+      // Update Mini Player & Full Player UI
       document.getElementById("player-title").textContent = title;
       document.getElementById("player-artist").textContent = artist;
       document.getElementById("player-art").src = artwork;
+
+      document.getElementById("full-track-title").textContent = title;
+      document.getElementById("full-track-artist").textContent = artist;
+      document.getElementById("full-player-art").src = artwork;
 
       const audio = document.getElementById("audio-element");
       if (audio && audioUrl) {
         audio.src = audioUrl;
         audio.play().then(() => {
           isPlaying = true;
-          document.getElementById("btn-play-pause").textContent = "⏸";
+          updatePlayButtons("⏸");
           if (currentRole === "HOST") broadcastHostState();
         }).catch(err => console.error("Audio error:", err));
       }
+    }
+
+    function updatePlayButtons(text) {
+      document.getElementById("btn-play-pause").textContent = text;
+      document.getElementById("btn-full-play").textContent = text;
     }
 
     async function performSearch() {
@@ -236,21 +291,53 @@
       document.getElementById("nav-btn-search").onclick = () => switchTab('tab-search', 'nav-btn-search');
       document.getElementById("nav-btn-together").onclick = () => switchTab('tab-together', 'nav-btn-together');
 
-      const btnPlay = document.getElementById("btn-play-pause");
       const audio = document.getElementById("audio-element");
-      if (btnPlay && audio) {
-        btnPlay.onclick = function() {
-          if (!audio.src) return;
-          if (isPlaying) {
-            audio.pause();
-            isPlaying = false;
-            btnPlay.textContent = "▶";
-          } else {
-            audio.play();
-            isPlaying = true;
-            btnPlay.textContent = "⏸";
+      const seekBar = document.getElementById("seek-bar");
+
+      function togglePlayPause() {
+        if (!audio.src) return;
+        if (isPlaying) {
+          audio.pause();
+          isPlaying = false;
+          updatePlayButtons("▶");
+        } else {
+          audio.play();
+          isPlaying = true;
+          updatePlayButtons("⏸");
+        }
+        if (currentRole === "HOST") broadcastHostState();
+      }
+
+      document.getElementById("btn-play-pause").onclick = togglePlayPause;
+      document.getElementById("btn-full-play").onclick = togglePlayPause;
+
+      document.getElementById("btn-next-track").onclick = function() {
+        currentTrackIndex = (currentTrackIndex + 1) % POPULAR_TRACKS.length;
+        const t = POPULAR_TRACKS[currentTrackIndex];
+        playSong(t.id, t.title, t.artist, t.artwork, t.audio);
+      };
+
+      document.getElementById("btn-prev-track").onclick = function() {
+        currentTrackIndex = (currentTrackIndex - 1 + POPULAR_TRACKS.length) % POPULAR_TRACKS.length;
+        const t = POPULAR_TRACKS[currentTrackIndex];
+        playSong(t.id, t.title, t.artist, t.artwork, t.audio);
+      };
+
+      if (audio) {
+        audio.ontimeupdate = function() {
+          if (!audio.duration) return;
+          const pct = (audio.currentTime / audio.duration) * 100;
+          if (seekBar) seekBar.value = pct;
+          document.getElementById("time-current").textContent = formatTime(audio.currentTime);
+          document.getElementById("time-duration").textContent = formatTime(audio.duration);
+        };
+      }
+
+      if (seekBar && audio) {
+        seekBar.oninput = function() {
+          if (audio.duration) {
+            audio.currentTime = (seekBar.value / 100) * audio.duration;
           }
-          if (currentRole === "HOST") broadcastHostState();
         };
       }
 
@@ -275,6 +362,13 @@
       };
 
       document.getElementById("btn-leave-room").onclick = leaveSession;
+    }
+
+    function formatTime(secs) {
+      if (isNaN(secs)) return "0:00";
+      const m = Math.floor(secs / 60);
+      const s = Math.floor(secs % 60);
+      return `${m}:${s < 10 ? '0' : ''}${s}`;
     }
 
     function generateRoomCode() {
@@ -356,11 +450,11 @@
           if (payload.is_playing && audio.paused) {
             audio.play();
             isPlaying = true;
-            document.getElementById("btn-play-pause").textContent = "⏸";
+            updatePlayButtons("⏸");
           } else if (!payload.is_playing && !audio.paused) {
             audio.pause();
             isPlaying = false;
-            document.getElementById("btn-play-pause").textContent = "▶";
+            updatePlayButtons("▶");
           }
         }
       }
@@ -379,7 +473,6 @@
       document.getElementById("together-setup").classList.remove("hidden");
     }
 
-    // Run UI Initialization immediately!
     initUI();
   </script>
 </body>
