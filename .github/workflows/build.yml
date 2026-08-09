@@ -64,7 +64,7 @@ jobs:
           cp iosApp/iosApp/Info.plist build/ios/Payload/Lyrra.app/
           
           # Compile Swift executable binary for iOS arm64
-          xcrun -sdk iphoneos swiftc iosApp/iosApp/main.swift iosApp/iosApp/ContentView.swift \
+          xcrun -sdk iphoneos swiftc -parse-as-library iosApp/iosApp/main.swift iosApp/iosApp/ContentView.swift \
             -target arm64-apple-ios16.0 \
             -F shared/build/bin/iosArm64/releaseFramework \
             -framework SharedFramework \
