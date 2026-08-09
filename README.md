@@ -7,7 +7,7 @@
 <h4 align="center">[MuseFlow v2](https://github.com/Panduu3163/Muse_Flow.git)</h4>
 
 <p align="center">
-  <b>🎵 A beautiful, ad-free music streaming app for Android</b>
+  <b>🎵 A beautiful, ad-free music streaming app for Android and ios</b>
 </p>
 
 <p align="center">
