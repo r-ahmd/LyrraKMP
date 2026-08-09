@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Lyrra - Listen Together</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="styles.css">
+  <meta name="theme-color" content="#8B5CF6">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Lyrra">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+  <div class="container">
+    <div class="header">
+      <h1>Lyrra</h1>
+      <p>Listen Together & Real-Time Sync</p>
+    </div>
+
+    <!-- PWA Install instructions banner for iOS -->
+    <div id="ios-pwa-prompt" class="pwa-banner hidden">
+      💡 Tap <strong>Share</strong> icon in Safari & Select <strong>Add to Home Screen</strong> to install Lyrra!
+    </div>
+
+    <!-- Connection Status -->
+    <div class="status-badge" id="status-badge">
+      <div class="status-dot" id="status-dot"></div>
+      <span id="status-text">Disconnected</span>
+    </div>
+
+    <!-- Mode Selection Screen -->
+    <div id="screen-setup" class="card-section">
+      <div class="section-title">Listen with Friends</div>
+      
+      <button class="btn btn-primary" id="btn-create-room">
+        ⚡ Create Room (Host)
+      </button>
+
+      <div style="text-align: center; color: var(--text-sub); font-size: 0.8rem; margin: 4px 0;">OR</div>
+
+      <div class="input-group">
+        <input type="text" id="input-room-code" placeholder="ROOM CODE" maxlength="6">
+        <button class="btn btn-secondary" id="btn-join-room" style="width: auto; padding: 12px 20px;">Join</button>
+      </div>
+    </div>
+
+    <!-- Active Room Screen -->
+    <div id="screen-room" class="card-section hidden">
+      <div class="section-title" id="room-role-title">Active Session</div>
+      
+      <div class="room-display" id="display-room-code">------</div>
+
+      <div class="player-card">
+        <div class="album-art" style="display:flex; align-items:center; justify-content:center; font-size:3rem; background:rgba(255,255,255,0.05);">🎵</div>
+        <div class="track-info">
+          <div class="track-title" id="track-title">Waiting for playback...</div>
+          <div class="track-artist" id="track-artist">Host controls the queue</div>
+        </div>
+      </div>
+
+      <div class="controls hidden" id="host-controls">
+        <button class="btn btn-secondary btn-circle" id="btn-prev">⏮</button>
+        <button class="btn btn-primary btn-circle" id="btn-play-pause">▶</button>
+        <button class="btn btn-secondary btn-circle" id="btn-next">⏭</button>
+      </div>
+
+      <button class="btn btn-danger" id="btn-leave-room" style="margin-top: 12px;">
+        Leave Session
+      </button>
+    </div>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
