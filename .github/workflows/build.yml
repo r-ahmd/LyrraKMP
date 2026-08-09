@@ -61,15 +61,16 @@ jobs:
           
           mkdir -p build/ios/Payload/Lyrra.app/Frameworks
           cp -R shared/build/bin/iosArm64/releaseFramework/SharedFramework.framework build/ios/Payload/Lyrra.app/Frameworks/
+          cp iosApp/iosApp/Info.plist build/ios/Payload/Lyrra.app/
           
-          cd iosApp
-          SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
-          xcrun -sdk iphoneos swift build -c release --triple arm64-apple-ios -Xswiftc "-sdk" -Xswiftc "$SDK_PATH" -Xswiftc "-F" -Xswiftc "../shared/build/bin/iosArm64/releaseFramework"
+          # Compile Swift executable binary for iOS arm64
+          xcrun -sdk iphoneos swiftc iosApp/iosApp/main.swift iosApp/iosApp/ContentView.swift \
+            -target arm64-apple-ios16.0 \
+            -F shared/build/bin/iosArm64/releaseFramework \
+            -framework SharedFramework \
+            -o build/ios/Payload/Lyrra.app/Lyrra
           
-          cp .build/arm64-apple-ios/release/Lyrra ../build/ios/Payload/Lyrra.app/Lyrra || touch ../build/ios/Payload/Lyrra.app/Lyrra
-          cp iosApp/Info.plist ../build/ios/Payload/Lyrra.app/
-          
-          cd ../build/ios
+          cd build/ios
           zip -r Lyrra-v1.0.3-iOS.ipa Payload/
           ls -lh Lyrra-v1.0.3-iOS.ipa
 
