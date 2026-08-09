@@ -232,7 +232,6 @@
               document.getElementById('full-track-title').textContent = 'Stream unavailable. Try another.';
               clearLoadingState();
             }
-            }
           };
         }
       });
@@ -327,7 +326,7 @@
               openFullPlayer();
               const audioUrl = await resolveStream(item.videoId);
               if (audioUrl) {
-                playSong(item.videoId, item.title, item.artist, art, audioUrl);
+                playSong(item.title, item.artist, art, audioUrl);
               } else {
                 document.getElementById('full-track-title').textContent = 'Stream unavailable. Try another.';
                 clearLoadingState();
