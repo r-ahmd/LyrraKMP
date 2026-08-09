@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Lyrra Music Player</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="styles.css">
+  <meta name="theme-color" content="#8B5CF6">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Lyrra">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+  <div class="app-container">
+    <!-- Top Header -->
+    <header class="app-header">
+      <div class="brand">
+        <span class="logo-icon">⚡</span>
+        <span class="brand-title">Lyrra</span>
+      </div>
+      <div class="status-badge" id="status-badge">
+        <div class="status-dot" id="status-dot"></div>
+        <span id="status-text">Solo</span>
+      </div>
+    </header>
+
+    <!-- iOS Install Banner -->
+    <div id="ios-pwa-prompt" class="pwa-banner hidden">
+      💡 Tap <strong>Share</strong> in Safari & select <strong>Add to Home Screen</strong> to install!
+    </div>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+
+      <!-- TAB 1: HOME / EXPLORE -->
+      <section id="tab-home" class="tab-page">
+        <h2 class="page-title">Trending & Popular</h2>
+        <div class="music-grid" id="home-grid"></div>
+      </section>
+
+      <!-- TAB 2: SEARCH -->
+      <section id="tab-search" class="tab-page hidden">
+        <div class="search-bar-container">
+          <input type="text" id="search-input" placeholder="Search songs, artists, albums...">
+          <button class="btn btn-primary" id="btn-search-trigger">Search</button>
+        </div>
+        <div class="music-list" id="search-results">
+          <div class="empty-state">Search for songs to start listening</div>
+        </div>
+      </section>
+
+      <!-- TAB 3: LISTEN TOGETHER -->
+      <section id="tab-together" class="tab-page hidden">
+        <div class="card-section">
+          <h2 class="page-title">Listen Together</h2>
+          <p class="subtitle">Sync music playback live with friends across Android & iOS!</p>
+
+          <!-- Setup screen -->
+          <div id="together-setup" class="together-box">
+            <button class="btn btn-primary" id="btn-create-room">
+              ⚡ Create Room (Host)
+            </button>
+            <div class="divider">OR</div>
+            <div class="input-group">
+              <input type="text" id="input-room-code" placeholder="6-CHAR CODE" maxlength="6">
+              <button class="btn btn-secondary" id="btn-join-room">Join</button>
+            </div>
+          </div>
+
+          <!-- Active Room info -->
+          <div id="together-active" class="together-box hidden">
+            <div class="room-role-badge" id="room-role-badge">HOST</div>
+            <div class="room-code-display" id="display-room-code">------</div>
+            <p class="subtitle" id="presence-count">1 member connected</p>
+
+            <button class="btn btn-danger" id="btn-leave-room" style="margin-top:12px;">
+              Leave Room
+            </button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Bottom Now Playing Bar -->
+    <div class="now-playing-bar" id="now-playing-bar">
+      <img id="player-art" src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=150" class="player-thumb" alt="Art">
+      <div class="player-details">
+        <div class="player-title" id="player-title">Select a track</div>
+        <div class="player-artist" id="player-artist">Lyrra Player</div>
+      </div>
+      <div class="player-controls">
+        <button class="icon-btn" id="btn-play-pause">▶</button>
+      </div>
+    </div>
+
+    <!-- Hidden HTML5 Audio Element -->
+    <audio id="audio-element" preload="auto"></audio>
+
+    <!-- Bottom Navigation Bar -->
+    <nav class="bottom-nav">
+      <button class="nav-item active" onclick="switchTab('tab-home', this)">
+        <span class="nav-icon">🔥</span>
+        <span class="nav-label">Home</span>
+      </button>
+      <button class="nav-item" onclick="switchTab('tab-search', this)">
+        <span class="nav-icon">🔍</span>
+        <span class="nav-label">Search</span>
+      </button>
+      <button class="nav-item" onclick="switchTab('tab-together', this)">
+        <span class="nav-icon">👥</span>
+        <span class="nav-label">Together</span>
+      </button>
+    </nav>
+  </div>
+
+  <script>
+    // Inline Self-Contained Engine
+    const SUPABASE_URL = "https://jzcnbbbzvsogkqkxdztm.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_enIYe3gEaqUcHp78L-VCFQ_K8G2dWtA";
+    let supabase = null;
+
+    if (window.supabase) {
+      supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    }
+
+    let currentTrack = null;
+    let isPlaying = false;
+    let currentChannel = null;
+    let currentRole = null;
+    let currentRoomCode = "";
+
+    const POPULAR_TRACKS = [
+      { id: "hT_nvWreI6o", title: "Blinding Lights", artist: "The Weeknd", artwork: "https://i.ytimg.com/vi/hT_nvWreI6o/hqdefault.jpg", audio: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview125/v4/4b/32/38/4b32386e-b6a8-a5b8-5b12-9c3f25c775ef/mzaf_16886470366472403662.plus.aac.p.m4a" },
+      { id: "0V3wOYp214k", title: "Save Your Tears", artist: "The Weeknd", artwork: "https://i.ytimg.com/vi/0V3wOYp214k/hqdefault.jpg", audio: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview115/v4/a3/37/10/a3371089-a9a3-5c79-e390-327c1a84f3e6/mzaf_14352777478051759600.plus.aac.p.m4a" },
+      { id: "OPf0YbXqDm0", title: "Uptown Funk", artist: "Mark Ronson ft. Bruno Mars", artwork: "https://i.ytimg.com/vi/OPf0YbXqDm0/hqdefault.jpg", audio: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview115/v4/ee/12/36/ee1236fb-893f-3619-7ebf-bc0c1d2e1c98/mzaf_3335275811776949987.plus.aac.p.m4a" },
+      { id: "34Na4j8AVgA", title: "Starboy", artist: "The Weeknd ft. Daft Punk", artwork: "https://i.ytimg.com/vi/34Na4j8AVgA/hqdefault.jpg", audio: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview115/v4/21/df/b5/21dfb5c4-0692-28df-29bb-132d72c1c3ae/mzaf_17296061329618174780.plus.aac.p.m4a" }
+    ];
+
+    window.onload = function() {
+      renderHomeGrid();
+      setupEvents();
+    };
+
+    function switchTab(tabId, el) {
+      document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+      document.querySelectorAll(".tab-page").forEach(p => p.classList.add("hidden"));
+      if (el) el.classList.add("active");
+      const page = document.getElementById(tabId);
+      if (page) page.classList.remove("hidden");
+    }
+
+    function renderHomeGrid() {
+      const grid = document.getElementById("home-grid");
+      if (!grid) return;
+      grid.innerHTML = POPULAR_TRACKS.map(t => `
+        <div class="track-card" onclick="playSong('${t.id}', '${escapeQuotes(t.title)}', '${escapeQuotes(t.artist)}', '${t.artwork}', '${t.audio}')">
+          <img src="${t.artwork}" class="track-cover" alt="art">
+          <div class="track-card-title">${t.title}</div>
+          <div class="track-card-artist">${t.artist}</div>
+        </div>
+      `).join("");
+    }
+
+    async function performSearch() {
+      const input = document.getElementById("search-input");
+      const results = document.getElementById("search-results");
+      if (!input || !results) return;
+      const q = input.value.trim();
+      if (!q) return;
+
+      results.innerHTML = `<div class="empty-state">Searching for "${q}"...</div>`;
+
+      try {
+        const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&entity=song&limit=15`);
+        const data = await res.json();
+        if (!data.results || data.results.length === 0) {
+          results.innerHTML = `<div class="empty-state">No songs found.</div>`;
+          return;
+        }
+
+        results.innerHTML = data.results.map(item => `
+          <div class="list-item" onclick="playSong('${item.trackId}', '${escapeQuotes(item.trackName)}', '${escapeQuotes(item.artistName)}', '${item.artworkUrl100}', '${item.previewUrl}')">
+            <img src="${item.artworkUrl100}" class="list-thumb">
+            <div class="list-info">
+              <div class="track-card-title">${item.trackName}</div>
+              <div class="track-card-artist">${item.artistName}</div>
+            </div>
+          </div>
+        `).join("");
+      } catch (err) {
+        results.innerHTML = `<div class="empty-state">Search error. Try again.</div>`;
+      }
+    }
+
+    function playSong(id, title, artist, artwork, audioUrl) {
+      currentTrack = { id, title, artist, artwork, audioUrl };
+
+      document.getElementById("player-title").textContent = title;
+      document.getElementById("player-artist").textContent = artist;
+      document.getElementById("player-art").src = artwork;
+
+      const audio = document.getElementById("audio-element");
+      if (audio && audioUrl) {
+        audio.src = audioUrl;
+        audio.play().then(() => {
+          isPlaying = true;
+          document.getElementById("btn-play-pause").textContent = "⏸";
+          if (currentRole === "HOST") broadcastHostState();
+        }).catch(err => console.error("Audio error:", err));
+      }
+    }
+
+    function setupEvents() {
+      const btnPlay = document.getElementById("btn-play-pause");
+      const audio = document.getElementById("audio-element");
+      const btnSearch = document.getElementById("btn-search-trigger");
+      const inputSearch = document.getElementById("search-input");
+
+      if (btnPlay && audio) {
+        btnPlay.onclick = function() {
+          if (!audio.src) return;
+          if (isPlaying) {
+            audio.pause();
+            isPlaying = false;
+            btnPlay.textContent = "▶";
+          } else {
+            audio.play();
+            isPlaying = true;
+            btnPlay.textContent = "⏸";
+          }
+          if (currentRole === "HOST") broadcastHostState();
+        };
+      }
+
+      if (btnSearch) btnSearch.onclick = performSearch;
+      if (inputSearch) {
+        inputSearch.onkeypress = function(e) {
+          if (e.key === "Enter") performSearch();
+        };
+      }
+
+      document.getElementById("btn-create-room").onclick = function() {
+        const code = generateRoomCode();
+        joinSession(code, "HOST");
+      };
+
+      document.getElementById("btn-join-room").onclick = function() {
+        const code = document.getElementById("input-room-code").value.trim().toUpperCase();
+        if (code.length === 6) joinSession(code, "LISTENER");
+        else alert("Enter 6-character room code.");
+      };
+
+      document.getElementById("btn-leave-room").onclick = leaveSession;
+    }
+
+    function generateRoomCode() {
+      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      let code = "";
+      for (let i = 0; i < 6; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+      return code;
+    }
+
+    function joinSession(roomCode, role) {
+      currentRoomCode = roomCode;
+      currentRole = role;
+
+      document.getElementById("display-room-code").textContent = roomCode;
+      document.getElementById("room-role-badge").textContent = role;
+
+      document.getElementById("together-setup").classList.add("hidden");
+      document.getElementById("together-active").classList.remove("hidden");
+
+      if (!supabase) return;
+
+      const topic = `realtime:${roomCode}`;
+      currentChannel = supabase.channel(topic, {
+        config: {
+          broadcast: { ack: false, self: false },
+          presence: { key: role === "HOST" ? "Host (Web)" : "Listener (Web)" }
+        }
+      });
+
+      currentChannel
+        .on('broadcast', { event: 'playback_sync' }, ({ payload }) => {
+          if (currentRole === "LISTENER") applySyncPayload(payload);
+        })
+        .on('presence', { event: 'sync' }, () => {
+          const state = currentChannel.presenceState();
+          document.getElementById("presence-count").textContent = `${Object.keys(state).length} member(s) connected`;
+        })
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            document.getElementById("status-dot").classList.add("connected");
+            document.getElementById("status-text").textContent = `Room ${roomCode} (${role})`;
+            currentChannel.track({ user: role === "HOST" ? "Host (Web)" : "Listener (Web)", online_at: new Date().toISOString() });
+            if (role === "HOST" && currentTrack) broadcastHostState();
+          } else {
+            document.getElementById("status-dot").classList.remove("connected");
+            document.getElementById("status-text").textContent = "Connecting...";
+          }
+        });
+    }
+
+    function broadcastHostState() {
+      if (!currentChannel || currentRole !== "HOST" || !currentTrack) return;
+      const audio = document.getElementById("audio-element");
+      currentChannel.send({
+        type: 'broadcast',
+        event: 'playback_sync',
+        payload: {
+          track_id: currentTrack.id,
+          track_title: currentTrack.title,
+          track_artist: currentTrack.artist,
+          track_image_url: currentTrack.artwork || "",
+          position_ms: audio ? Math.floor(audio.currentTime * 1000) : 0,
+          is_playing: isPlaying,
+          stream_url: currentTrack.audioUrl || ""
+        }
+      });
+    }
+
+    function applySyncPayload(payload) {
+      if (!currentTrack || currentTrack.id !== payload.track_id) {
+        playSong(payload.track_id, payload.track_title, payload.track_artist, payload.track_image_url, payload.stream_url);
+      } else {
+        const audio = document.getElementById("audio-element");
+        if (audio) {
+          if (payload.is_playing && audio.paused) {
+            audio.play();
+            isPlaying = true;
+            document.getElementById("btn-play-pause").textContent = "⏸";
+          } else if (!payload.is_playing && !audio.paused) {
+            audio.pause();
+            isPlaying = false;
+            document.getElementById("btn-play-pause").textContent = "▶";
+          }
+        }
+      }
+    }
+
+    function leaveSession() {
+      if (currentChannel && supabase) {
+        supabase.removeChannel(currentChannel);
+        currentChannel = null;
+      }
+      currentRole = null;
+      currentRoomCode = "";
+      document.getElementById("status-dot").classList.remove("connected");
+      document.getElementById("status-text").textContent = "Solo";
+      document.getElementById("together-active").classList.add("hidden");
+      document.getElementById("together-setup").classList.remove("hidden");
+    }
+
+    function escapeQuotes(str) {
+      if (!str) return "";
+      return str.replace(/'/g, "\\'").replace(/"/g, '\\"');
+    }
+  </script>
+</body>
+</html>
