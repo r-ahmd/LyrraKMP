@@ -19,7 +19,6 @@ debug.keystore
 .claude/settings.local.json
 .scratch/
 repo/
-my-upload-key.jks
 
 # Shared module build
 shared/build/
