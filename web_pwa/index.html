@@ -89,7 +89,7 @@
     <div class="now-playing-bar" id="now-playing-bar" onclick="openFullPlayer()">
       <img id="player-art" src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=150" class="player-thumb" alt="Art">
       <div class="player-details">
-        <div class="player-title" id="player-title">Select a track</div>
+        <div class="player-title" id="player-title">Select a track to play</div>
         <div class="player-artist" id="player-artist">Lyrra Player</div>
       </div>
       <div class="player-controls" onclick="event.stopPropagation()">
@@ -163,12 +163,30 @@
     let currentRole = null;
     let currentRoomCode = "";
 
+    // Popular tracks — audio fetched fresh from iTunes API on each tap (no stale URLs)
     const POPULAR_TRACKS = [
-      { id: "hT_nvWreI6o", title: "Blinding Lights", artist: "The Weeknd", artwork: "https://i.ytimg.com/vi/hT_nvWreI6o/hqdefault.jpg", audio: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview125/v4/4b/32/38/4b32386e-b6a8-a5b8-5b12-9c3f25c775ef/mzaf_16886470366472403662.plus.aac.p.m4a" },
-      { id: "0V3wOYp214k", title: "Save Your Tears", artist: "The Weeknd", artwork: "https://i.ytimg.com/vi/0V3wOYp214k/hqdefault.jpg", audio: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview115/v4/a3/37/10/a3371089-a9a3-5c79-e390-327c1a84f3e6/mzaf_14352777478051759600.plus.aac.p.m4a" },
-      { id: "OPf0YbXqDm0", title: "Uptown Funk", artist: "Mark Ronson ft. Bruno Mars", artwork: "https://i.ytimg.com/vi/OPf0YbXqDm0/hqdefault.jpg", audio: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview115/v4/ee/12/36/ee1236fb-893f-3619-7ebf-bc0c1d2e1c98/mzaf_3335275811776949987.plus.aac.p.m4a" },
-      { id: "34Na4j8AVgA", title: "Starboy", artist: "The Weeknd ft. Daft Punk", artwork: "https://i.ytimg.com/vi/34Na4j8AVgA/hqdefault.jpg", audio: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview115/v4/21/df/b5/21dfb5c4-0692-28df-29bb-132d72c1c3ae/mzaf_17296061329618174780.plus.aac.p.m4a" }
+      { title: "Blinding Lights",  artist: "The Weeknd",              artwork: "https://i.ytimg.com/vi/hT_nvWreI6o/hqdefault.jpg" },
+      { title: "Save Your Tears",  artist: "The Weeknd",              artwork: "https://i.ytimg.com/vi/0V3wOYp214k/hqdefault.jpg" },
+      { title: "Uptown Funk",      artist: "Mark Ronson Bruno Mars",  artwork: "https://i.ytimg.com/vi/OPf0YbXqDm0/hqdefault.jpg" },
+      { title: "Starboy",          artist: "The Weeknd",              artwork: "https://i.ytimg.com/vi/34Na4j8AVgA/hqdefault.jpg" },
+      { title: "Bohemian Rhapsody",artist: "Queen",                   artwork: "https://i.ytimg.com/vi/fJ9rUzIMcZQ/hqdefault.jpg" },
+      { title: "Despacito",        artist: "Luis Fonsi",              artwork: "https://i.ytimg.com/vi/kJQP7kiw5Fk/hqdefault.jpg" }
     ];
+
+    // Fetch a fresh preview URL from iTunes API each time
+    async function fetchFreshAudio(title, artist) {
+      try {
+        const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(title + ' ' + artist)}&entity=song&limit=1`);
+        const data = await res.json();
+        if (data.results && data.results.length > 0 && data.results[0].previewUrl) {
+          return {
+            audioUrl: data.results[0].previewUrl,
+            artwork:  data.results[0].artworkUrl100.replace('100x100', '600x600')
+          };
+        }
+      } catch (e) { console.warn('iTunes fetch error', e); }
+      return null;
+    }
 
     function initUI() {
       renderGrid();
@@ -210,35 +228,69 @@
       POPULAR_TRACKS.forEach((t, idx) => {
         const card = document.getElementById(`card-${idx}`);
         if (card) {
-          card.onclick = function() {
+          card.onclick = async function() {
             currentTrackIndex = idx;
-            playSong(t.id, t.title, t.artist, t.artwork, t.audio);
+            // Show loading state immediately
+            setLoadingState(t.title, t.artist, t.artwork);
+            openFullPlayer();
+            // Fetch fresh audio URL from iTunes
+            const fresh = await fetchFreshAudio(t.title, t.artist);
+            if (fresh) {
+              playSong(t.title, t.artist, fresh.artwork, fresh.audioUrl);
+            } else {
+              document.getElementById('full-track-title').textContent = 'Could not load. Try another song.';
+              clearLoadingState();
+            }
           };
         }
       });
     }
 
-    function playSong(id, title, artist, artwork, audioUrl) {
-      currentTrack = { id, title, artist, artwork, audioUrl };
+    function setLoadingState(title, artist, artwork) {
+      document.getElementById('player-title').textContent = 'Loading...';
+      document.getElementById('player-artist').textContent = artist;
+      document.getElementById('player-art').src = artwork;
+      document.getElementById('full-track-title').textContent = 'Loading...';
+      document.getElementById('full-track-artist').textContent = artist;
+      document.getElementById('full-player-art').src = artwork;
+      document.getElementById('btn-full-play').textContent = '⏳';
+      document.getElementById('btn-play-pause').textContent = '⏳';
+    }
 
-      // Update Mini Player & Full Player UI
-      document.getElementById("player-title").textContent = title;
-      document.getElementById("player-artist").textContent = artist;
-      document.getElementById("player-art").src = artwork;
+    function clearLoadingState() {
+      document.getElementById('btn-full-play').textContent = '▶';
+      document.getElementById('btn-play-pause').textContent = '▶';
+    }
 
-      document.getElementById("full-track-title").textContent = title;
-      document.getElementById("full-track-artist").textContent = artist;
-      document.getElementById("full-player-art").src = artwork;
+    function playSong(title, artist, artwork, audioUrl) {
+      currentTrack = { id: title, title, artist, artwork, audioUrl };
 
-      const audio = document.getElementById("audio-element");
-      if (audio && audioUrl) {
-        audio.src = audioUrl;
-        audio.play().then(() => {
-          isPlaying = true;
-          updatePlayButtons("⏸");
-          if (currentRole === "HOST") broadcastHostState();
-        }).catch(err => console.error("Audio error:", err));
-      }
+      document.getElementById('player-title').textContent = title;
+      document.getElementById('player-artist').textContent = artist;
+      document.getElementById('player-art').src = artwork;
+      document.getElementById('full-track-title').textContent = title;
+      document.getElementById('full-track-artist').textContent = artist;
+      document.getElementById('full-player-art').src = artwork;
+
+      const audio = document.getElementById('audio-element');
+      if (!audio || !audioUrl) return;
+
+      audio.pause();
+      audio.src = audioUrl;
+      audio.load();
+
+      // Show buffering state while loading
+      audio.onwaiting = () => { updatePlayButtons('⏳'); };
+      audio.oncanplay = () => { clearLoadingState(); };
+
+      audio.play().then(() => {
+        isPlaying = true;
+        updatePlayButtons('⏸');
+        if (currentRole === 'HOST') broadcastHostState();
+      }).catch(err => {
+        console.error('Audio error:', err);
+        clearLoadingState();
+      });
     }
 
     function updatePlayButtons(text) {
@@ -277,7 +329,9 @@
           const el = document.getElementById(`search-item-${idx}`);
           if (el) {
             el.onclick = function() {
-              playSong(item.trackId, item.trackName, item.artistName, item.artworkUrl100, item.previewUrl);
+              const hqArt = item.artworkUrl100.replace('100x100', '600x600');
+              playSong(item.trackName, item.artistName, hqArt, item.previewUrl);
+              openFullPlayer();
             };
           }
         });
