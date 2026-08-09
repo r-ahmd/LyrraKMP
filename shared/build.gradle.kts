@@ -5,6 +5,10 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+composeCompiler {
+    targetKotlinPlatforms = setOf(org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType.androidJvm)
+}
+
 kotlin {
     android {
         namespace = "com.lyrra.shared"
@@ -27,6 +31,7 @@ kotlin {
         commonMain.dependencies {
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.ktor.client.core)
+            implementation(libs.ktor.client.websockets)
             implementation(libs.ktor.client.content.negotiation)
             implementation(libs.ktor.serialization.json)
         }
