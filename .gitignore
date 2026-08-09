@@ -20,3 +20,6 @@ debug.keystore
 .scratch/
 repo/
 my-upload-key.jks
+
+# Shared module build
+shared/build/
