@@ -35,10 +35,12 @@ class LikedSongsRepository private constructor(context: Context) {
                 artistId = track.artistId,
             )
         )
+        Analytics.logTrackLiked(track.sourceId ?: track.downloadKey(), track.title, true)
     }
 
     suspend fun unlike(track: Track) {
         dao.unlike(track.downloadKey())
+        Analytics.logTrackLiked(track.sourceId ?: track.downloadKey(), track.title, false)
     }
 
     companion object {

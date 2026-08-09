@@ -176,14 +176,14 @@ class PlaybackService : MediaSessionService() {
     private fun autoplayRelated(player: ExoPlayer) {
         if (autoplayInFlight) return
         val finished = player.currentMediaItem ?: return
-        val artist = finished.mediaMetadata.artist?.toString()?.takeIf { it.isNotBlank() } ?: return
+        val videoId = finished.mediaId.takeIf { it.startsWith("http").not() && it.contains("|").not() } ?: return
         val existingIds = (0 until player.mediaItemCount)
             .map { player.getMediaItemAt(it).mediaId }
             .toSet()
 
         autoplayInFlight = true
         serviceScope.launch {
-            val related = runCatching { MusicSearchRouter(this@PlaybackService).searchTracks(artist) }
+            val related = runCatching { MusicSearchRouter(this@PlaybackService).getRadioTracks(videoId) }
                 .getOrNull()
                 .orEmpty()
                 .filter { it.id !in existingIds }
@@ -212,6 +212,24 @@ class PlaybackService : MediaSessionService() {
             }
             autoplayInFlight = false
         }
+    }
+
+    private fun broadcastHostState(player: ExoPlayer) {
+        val item = player.currentMediaItem ?: return
+        val metadata = item.mediaMetadata
+        val uri = item.localConfiguration?.uri
+        val videoId = uri?.let { youTubeVideoIdFromResolvePlaceholder(it) } ?: item.mediaId
+
+        ListenTogetherManager.broadcastPlaybackState(
+            trackId = item.mediaId,
+            trackTitle = metadata.title?.toString().orEmpty(),
+            trackArtist = metadata.artist?.toString().orEmpty(),
+            trackImageUrl = metadata.artworkUri?.toString(),
+            positionMs = player.currentPosition.coerceAtLeast(0L),
+            isPlaying = player.isPlaying,
+            sourceType = "YOUTUBE",
+            sourceId = videoId
+        )
     }
 
     /**
@@ -292,6 +310,50 @@ class PlaybackService : MediaSessionService() {
             // on from Now Playing; when a queue genuinely ends, autoplay takes over instead.
             .apply { repeatMode = Player.REPEAT_MODE_OFF }
 
+        ListenTogetherManager.playbackController = object : ListenTogetherManager.PlaybackController {
+            override fun onSyncReceived(
+                trackId: String,
+                trackTitle: String,
+                trackArtist: String,
+                trackImageUrl: String?,
+                positionMs: Long,
+                isPlaying: Boolean,
+                sourceType: String?,
+                sourceId: String?
+            ) {
+                serviceScope.launch {
+                    val currentItem = player.currentMediaItem
+                    val currentTitle = currentItem?.mediaMetadata?.title?.toString()
+                    if (currentTitle != trackTitle && trackTitle.isNotEmpty()) {
+                        val videoIdToUse = sourceId?.takeIf { it.isNotBlank() && !it.contains("::") } ?: trackId
+                        val uriToSet = youTubeResolvePlaceholderUri(videoIdToUse)
+
+                        val mediaItem = MediaItem.Builder()
+                            .setMediaId(trackId.ifEmpty { trackTitle })
+                            .setUri(uriToSet)
+                            .setMediaMetadata(
+                                MediaMetadata.Builder()
+                                    .setTitle(trackTitle)
+                                    .setArtist(trackArtist)
+                                    .apply { trackImageUrl?.let { setArtworkUri(it.toUri()) } }
+                                    .build()
+                            )
+                            .build()
+                        player.setMediaItem(mediaItem)
+                        player.prepare()
+                        player.seekTo(positionMs)
+                        if (isPlaying) player.play() else player.pause()
+                    } else {
+                        if (kotlin.math.abs(player.currentPosition - positionMs) > 2500) {
+                            player.seekTo(positionMs)
+                        }
+                        if (isPlaying && !player.isPlaying) player.play()
+                        if (!isPlaying && player.isPlaying) player.pause()
+                    }
+                }
+            }
+        }
+
         player.addListener(object : Player.Listener {
             // A track that failed to resolve/stream (dead CDN link, blank search results, no
             // network, ...) has no valid source and would otherwise freeze the queue; skip
@@ -300,6 +362,8 @@ class PlaybackService : MediaSessionService() {
             // rather than spinning through all ten mock-catalog tracks forever.
             override fun onPlayerError(error: PlaybackException) {
                 consecutiveErrorCount++
+                val trackId = player.currentMediaItem?.mediaId ?: "unknown"
+                Analytics.logPlaybackError(trackId, error.message ?: "Playback error")
                 if (consecutiveErrorCount < player.mediaItemCount.coerceAtLeast(1)) {
                     player.seekToNextMediaItem()
                     player.prepare()
@@ -308,6 +372,15 @@ class PlaybackService : MediaSessionService() {
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 if (isPlaying) consecutiveErrorCount = 0
+                broadcastHostState(player)
+            }
+
+            override fun onPositionDiscontinuity(
+                oldPosition: Player.PositionInfo,
+                newPosition: Player.PositionInfo,
+                reason: Int
+            ) {
+                broadcastHostState(player)
             }
 
             // Queue exhausted: keep the music going with tracks related to what just finished,
@@ -315,6 +388,7 @@ class PlaybackService : MediaSessionService() {
             // wraps before this is ever reached.
             override fun onPlaybackStateChanged(playbackState: Int) {
                 if (playbackState == Player.STATE_ENDED) autoplayRelated(player)
+                broadcastHostState(player)
             }
 
             // Warm the next track's stream URL while the current one is still playing, so a skip
@@ -322,13 +396,31 @@ class PlaybackService : MediaSessionService() {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 preloadNextTrack(player)
                 saveQueue(player)
-                mediaItem?.let(::prefetchFullTrack)
+                mediaItem?.let { item ->
+                    prefetchFullTrack(item)
+                    Analytics.logTrackPlayed(
+                        trackId = item.mediaId,
+                        title = item.mediaMetadata.title?.toString().orEmpty(),
+                        artist = item.mediaMetadata.artist?.toString().orEmpty()
+                    )
+                    broadcastHostState(player)
+                }
             }
 
             override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
                 saveQueue(player)
             }
         })
+
+        // Periodic 2-second host broadcast loop so listeners stay in sync
+        serviceScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(2000)
+                if (player.isPlaying) {
+                    broadcastHostState(player)
+                }
+            }
+        }
 
         serviceScope.launch {
             AppSettingsRepository(this@PlaybackService).state.collect { settings ->

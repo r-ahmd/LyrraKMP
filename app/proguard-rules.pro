@@ -12,10 +12,11 @@
 #   public *;
 #}
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Ignore missing optional classes from third party libraries
+-dontwarn com.google.re2j.**
+-dontwarn java.awt.**
+-dontwarn java.beans.**
+-dontwarn javax.imageio.**
+-dontwarn org.mozilla.javascript.**
+-dontwarn org.jaudiotagger.**
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile

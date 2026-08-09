@@ -30,7 +30,7 @@ class TrackStreamResolver(
                 runCatching {
                     val match = YouTubeMusicProvider(appContext)
                         .search("${track.title} ${track.artist}")
-                        .firstOrNull()
+                        .items.firstOrNull()
                     val streamUrl = match?.let { StreamResolverRouter.resolve(appContext, it.id)?.url }
                     if (match != null && streamUrl != null) {
                         match.copy(directStreamUrl = streamUrl)

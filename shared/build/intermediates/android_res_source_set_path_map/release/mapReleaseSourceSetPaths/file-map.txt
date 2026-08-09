@@ -1,0 +1,9 @@
+com.lyrra.shared-pngs-0 /home/mr/StudioProjects/Lyrrav2/shared/build/generated/res/pngs/release
+com.lyrra.shared-updated_navigation_xml-1 /home/mr/StudioProjects/Lyrrav2/shared/build/generated/updated_navigation_xml/release
+com.lyrra.shared-mergeReleaseResources-2 /home/mr/StudioProjects/Lyrrav2/shared/build/intermediates/incremental/release/mergeReleaseResources/merged.dir
+com.lyrra.shared-mergeReleaseResources-3 /home/mr/StudioProjects/Lyrrav2/shared/build/intermediates/incremental/release/mergeReleaseResources/stripped.dir
+com.lyrra.shared-release-4 /home/mr/StudioProjects/Lyrrav2/shared/build/intermediates/merged_res/release/mergeReleaseResources
+com.lyrra.shared-release-5 /home/mr/StudioProjects/Lyrrav2/shared/build/intermediates/packaged_res/release/packageReleaseResources
+com.lyrra.shared-main-6 /home/mr/StudioProjects/Lyrrav2/shared/src/main/res
+com.lyrra.shared-release-7 /home/mr/StudioProjects/Lyrrav2/shared/src/release/res
+gradleHome-0 /home/mr/.gradle

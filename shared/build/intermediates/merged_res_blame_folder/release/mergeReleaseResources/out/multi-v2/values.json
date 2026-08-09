@@ -1,0 +1,34 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.lyrra.shared-release-4:/values/values.xml",
+            "map": [
+                {
+                    "source": "/home/mr/.gradle/caches/9.6.1/transforms/cff4da8f05b23571c254a64dc095196f/transformed/startup-runtime-1.2.0/res/values/values.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endColumns": "82",
+                        "endOffsets": "133"
+                    }
+                }
+            ]
+        },
+        {
+            "outputFile": "com.lyrra.shared-mergeReleaseResources-2:/values/values.xml",
+            "map": [
+                {
+                    "source": "/home/mr/.gradle/caches/9.6.1/transforms/cff4da8f05b23571c254a64dc095196f/transformed/startup-runtime-1.2.0/res/values/values.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endColumns": "82",
+                        "endOffsets": "133"
+                    }
+                }
+            ]
+        }
+    ]
+}

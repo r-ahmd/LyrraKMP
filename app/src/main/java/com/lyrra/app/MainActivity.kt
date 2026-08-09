@@ -26,17 +26,26 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -46,6 +55,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -230,6 +240,65 @@ fun LyrraApp() {
         if (showOnboarding) {
             OnboardingDialog(onContinue = onboardingViewModel::markSeen)
         }
+
+        val updateViewModel: UpdateViewModel = viewModel()
+        val updateState by updateViewModel.updateState.collectAsState()
+        val uriHandler = LocalUriHandler.current
+
+        LaunchedEffect(Unit) {
+            updateViewModel.checkForUpdates()
+        }
+
+        when (val state = updateState) {
+            is UpdateStatus.UpdateAvailable -> {
+                AlertDialog(
+                    onDismissRequest = { updateViewModel.dismiss() },
+                    modifier = Modifier.padding(16.dp),
+                    title = { Text("Update Available", style = MaterialTheme.typography.titleMedium) },
+                    text = { 
+                        Column(
+                            modifier = Modifier
+                                .heightIn(max = 280.dp)
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            Text("A new version of Lyrra (v${state.update.version}) is available.")
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                text = state.update.changelog,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            state.update.directDownloadUrl?.let { directUrl ->
+                                TextButton(onClick = { 
+                                    uriHandler.openUri(directUrl)
+                                    updateViewModel.dismiss()
+                                }) {
+                                    Text("Download APK")
+                                }
+                            }
+                            TextButton(onClick = { 
+                                uriHandler.openUri(state.update.releaseUrl)
+                                updateViewModel.dismiss()
+                            }) {
+                                Text("View Release")
+                            }
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { updateViewModel.dismiss() }) {
+                            Text("Later")
+                        }
+                    }
+                )
+            }
+            else -> {}
+        }
       }
     }
 }
@@ -300,6 +369,7 @@ private fun LyrraNavHost(
             onOpenHistory = { navController.navigate(Routes.HISTORY) },
             onOpenBackup = { navController.navigate(Routes.BACKUP) },
             onOpenCrashLogs = { navController.navigate(Routes.CRASH_LOGS) },
+            onOpenListenTogether = { navController.navigate(Routes.LISTEN_TOGETHER) },
             onOpenCharts = { navController.navigate(Routes.CHARTS) },
             onOpenNewReleases = { navController.navigate(Routes.NEW_RELEASES) },
             onOpenExplore = { navController.navigate(Routes.EXPLORE) },
@@ -309,6 +379,9 @@ private fun LyrraNavHost(
         )
         composable(Routes.BACKUP) {
             BackupSettingsScreen(onBack = { navController.popBackStack() })
+        }
+        composable(Routes.LISTEN_TOGETHER) {
+            com.lyrra.app.ui.screens.ListenTogetherScreen(onBack = { navController.popBackStack() })
         }
         composable(Routes.CRASH_LOGS) {
             CrashLogsScreen(onBack = { navController.popBackStack() })
@@ -630,6 +703,7 @@ private fun NavGraphBuilder.topLevelGraph(
     onOpenHistory: () -> Unit,
     onOpenBackup: () -> Unit,
     onOpenCrashLogs: () -> Unit,
+    onOpenListenTogether: () -> Unit,
     onOpenCharts: () -> Unit,
     onOpenNewReleases: () -> Unit,
     onOpenExplore: () -> Unit,
@@ -641,6 +715,7 @@ private fun NavGraphBuilder.topLevelGraph(
         HomeScreen(
             onPlayTrack = onPlayTrack,
             onOpenPlaylist = onOpenPlaylist,
+            onOpenArtist = onGoToArtist,
             onOpenRemotePlaylist = onGoToRemotePlaylist,
         )
     }
@@ -672,6 +747,7 @@ private fun NavGraphBuilder.topLevelGraph(
             onOpenEqualizer = onOpenEqualizer,
             onOpenBackup = onOpenBackup,
             onOpenCrashLogs = onOpenCrashLogs,
+            onOpenListenTogether = onOpenListenTogether,
         )
     }
 }

@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Waves
 import androidx.compose.material.icons.filled.RoundedCorner
 import androidx.compose.material3.Icon
@@ -101,6 +102,7 @@ fun SettingsScreen(
     onOpenEqualizer: () -> Unit = {},
     onOpenBackup: () -> Unit = {},
     onOpenCrashLogs: () -> Unit = {},
+    onOpenListenTogether: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val themeViewModel: ThemeViewModel = viewModel()
@@ -110,6 +112,7 @@ fun SettingsScreen(
     val settings by settingsViewModel.state.collectAsState()
 
     var showColorPicker by remember { mutableStateOf(false) }
+//    var showPrivacyPolicy by remember { mutableStateOf(false) }
 
     if (showColorPicker) {
         ColorPickerDialog(
@@ -121,6 +124,21 @@ fun SettingsScreen(
             onDismiss = { showColorPicker = false },
         )
     }
+
+/*    if (showPrivacyPolicy) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showPrivacyPolicy = false },
+            title = { Text("Privacy Policy") },
+            text = { 
+                Text("This app is for personal use. It uses Firebase Analytics to track Crashlytics for stability reporting. No personal data is sold or shared.")
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { showPrivacyPolicy = false }) {
+                    Text("Close")
+                }
+            }
+        )
+    }*/
 
     LazyColumn(
         modifier = modifier
@@ -445,6 +463,12 @@ fun SettingsScreen(
                     onSelect = settingsViewModel::setDefaultOpenTab,
                 )
                 NavigationPreference(
+                    title = "Listen with Friends",
+                    subtitle = "Host or join a real-time synchronized music session.",
+                    icon = Icons.Default.Group,
+                    onClick = onOpenListenTogether,
+                )
+                NavigationPreference(
                     title = "Backup & restore",
                     subtitle = "Export liked songs and playlists, or restore them.",
                     icon = Icons.Default.Backup,
@@ -456,6 +480,12 @@ fun SettingsScreen(
                     icon = Icons.Default.BugReport,
                     onClick = onOpenCrashLogs,
                 )
+//                NavigationPreference(
+//                    title = "Privacy Policy",
+//                    subtitle = "Subtle technical compliance for personal use.",
+//                    icon = Icons.Default.Circle,
+//                    onClick = { showPrivacyPolicy = true },
+//                )
             }
         }
 
@@ -502,6 +532,13 @@ fun SettingsScreen(
                     text = "Supported on Android 11+ (API 30+)",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+                Text(
+                    text = "Developed by r-ahmd",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(top = 8.dp)
                 )
             }
         }

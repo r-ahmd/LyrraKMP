@@ -22,65 +22,111 @@ class InnerTubeMusicProvider(private val context: Context) : Provider<TrackResul
     // getOrThrow, not getOrNull: swallowing the failure here would make "the network is down"
     // look identical to "YouTube genuinely has no results", which is precisely the ambiguity the
     // strict extractor routing exists to avoid. The ViewModel turns the throw into a real error.
-    override suspend fun search(query: String): List<TrackResult> =
-        YouTube.search(query, YouTube.SearchFilter.FILTER_SONG)
-            .getOrThrow()
-            .items
-            .filterIsInstance<SongItem>()
-            .map { it.toTrackResult() }
+    override suspend fun search(query: String): SearchResults<TrackResult> {
+        val result = YouTube.search(query, YouTube.SearchFilter.FILTER_SONG).getOrThrow()
+        return SearchResults(
+            items = result.items.filterIsInstance<SongItem>().map { it.toTrackResult() },
+            continuation = result.continuation
+        )
+    }
+
+    override suspend fun searchContinuation(continuation: String): SearchResults<TrackResult> {
+        val result = YouTube.searchContinuation(continuation).getOrThrow()
+        return SearchResults(
+            items = result.items.filterIsInstance<SongItem>().map { it.toTrackResult() },
+            continuation = result.continuation
+        )
+    }
 
     /** Resolved entirely within the ported module - see [InnerTubeStreamResolver]. */
     override suspend fun getStreamUrl(item: TrackResult): StreamResolution? =
         InnerTubeStreamResolver.resolve(item.id)
 
-    suspend fun searchAlbums(query: String): List<AlbumResult> =
-        YouTube.search(query, YouTube.SearchFilter.FILTER_ALBUM)
-            .getOrThrow()
-            .items
-            .filterIsInstance<AlbumItem>()
-            .map { album ->
-                AlbumResult(
-                    id = album.browseId,
-                    title = album.title,
-                    artist = album.artists?.joinToString(", ") { it.name }.orEmpty(),
-                    imageUrl = album.thumbnail,
-                    songCount = null,
-                    sourceType = MusicSource.YOUTUBE_MUSIC,
-                )
-            }
-            .orEmpty()
+    suspend fun searchAlbums(query: String): SearchResults<AlbumResult> {
+        val result = YouTube.search(query, YouTube.SearchFilter.FILTER_ALBUM).getOrThrow()
+        val items = result.items.filterIsInstance<AlbumItem>().map { album ->
+            AlbumResult(
+                id = album.browseId,
+                title = album.title,
+                artist = album.artists?.joinToString(", ") { it.name }.orEmpty(),
+                imageUrl = album.thumbnail,
+                songCount = null,
+                sourceType = MusicSource.YOUTUBE_MUSIC,
+            )
+        }
+        return SearchResults(items = items, continuation = result.continuation)
+    }
 
-    suspend fun searchArtists(query: String): List<ArtistResult> =
-        YouTube.search(query, YouTube.SearchFilter.FILTER_ARTIST)
-            .getOrThrow()
-            .items
-            .filterIsInstance<ArtistItem>()
-            .map { artist ->
-                ArtistResult(
-                    id = artist.id,
-                    name = artist.title,
-                    imageUrl = artist.thumbnail,
-                    sourceType = MusicSource.YOUTUBE_MUSIC,
-                )
-            }
-            .orEmpty()
+    suspend fun searchAlbumsContinuation(continuation: String): SearchResults<AlbumResult> {
+        val result = YouTube.searchContinuation(continuation).getOrThrow()
+        val items = result.items.filterIsInstance<AlbumItem>().map { album ->
+            AlbumResult(
+                id = album.browseId,
+                title = album.title,
+                artist = album.artists?.joinToString(", ") { it.name }.orEmpty(),
+                imageUrl = album.thumbnail,
+                songCount = null,
+                sourceType = MusicSource.YOUTUBE_MUSIC,
+            )
+        }
+        return SearchResults(items = items, continuation = result.continuation)
+    }
 
-    suspend fun searchPlaylists(query: String): List<PlaylistResult> =
-        YouTube.search(query, YouTube.SearchFilter.FILTER_COMMUNITY_PLAYLIST)
-            .getOrThrow()
-            .items
-            .filterIsInstance<PlaylistItem>()
-            .map { playlist ->
-                PlaylistResult(
-                    id = playlist.id,
-                    title = playlist.title,
-                    subtitle = playlist.author?.name.orEmpty(),
-                    imageUrl = playlist.thumbnail,
-                    songCount = playlist.songCountText.asSongCount(),
-                    sourceType = MusicSource.YOUTUBE_MUSIC,
-                )
-            }
-            .orEmpty()
+    suspend fun searchArtists(query: String): SearchResults<ArtistResult> {
+        val result = YouTube.search(query, YouTube.SearchFilter.FILTER_ARTIST).getOrThrow()
+        val items = result.items.filterIsInstance<ArtistItem>().map { artist ->
+            ArtistResult(
+                id = artist.id,
+                name = artist.title,
+                imageUrl = artist.thumbnail,
+                sourceType = MusicSource.YOUTUBE_MUSIC,
+            )
+        }
+        return SearchResults(items = items, continuation = result.continuation)
+    }
+
+    suspend fun searchArtistsContinuation(continuation: String): SearchResults<ArtistResult> {
+        val result = YouTube.searchContinuation(continuation).getOrThrow()
+        val items = result.items.filterIsInstance<ArtistItem>().map { artist ->
+            ArtistResult(
+                id = artist.id,
+                name = artist.title,
+                imageUrl = artist.thumbnail,
+                sourceType = MusicSource.YOUTUBE_MUSIC,
+            )
+        }
+        return SearchResults(items = items, continuation = result.continuation)
+    }
+
+    suspend fun searchPlaylists(query: String): SearchResults<PlaylistResult> {
+        val result = YouTube.search(query, YouTube.SearchFilter.FILTER_COMMUNITY_PLAYLIST).getOrThrow()
+        val items = result.items.filterIsInstance<PlaylistItem>().map { playlist ->
+            PlaylistResult(
+                id = playlist.id,
+                title = playlist.title,
+                subtitle = playlist.author?.name.orEmpty(),
+                imageUrl = playlist.thumbnail,
+                songCount = playlist.songCountText.asSongCount(),
+                sourceType = MusicSource.YOUTUBE_MUSIC,
+            )
+        }
+        return SearchResults(items = items, continuation = result.continuation)
+    }
+
+    suspend fun searchPlaylistsContinuation(continuation: String): SearchResults<PlaylistResult> {
+        val result = YouTube.searchContinuation(continuation).getOrThrow()
+        val items = result.items.filterIsInstance<PlaylistItem>().map { playlist ->
+            PlaylistResult(
+                id = playlist.id,
+                title = playlist.title,
+                subtitle = playlist.author?.name.orEmpty(),
+                imageUrl = playlist.thumbnail,
+                songCount = playlist.songCountText.asSongCount(),
+                sourceType = MusicSource.YOUTUBE_MUSIC,
+            )
+        }
+        return SearchResults(items = items, continuation = result.continuation)
+    }
 
     /** Search suggestions as the user types - an endpoint the legacy provider never had. */
     suspend fun suggestions(query: String): List<String> =

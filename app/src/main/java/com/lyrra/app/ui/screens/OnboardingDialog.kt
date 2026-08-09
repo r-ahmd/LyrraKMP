@@ -141,7 +141,7 @@ fun OnboardingDialog(
     }
 }
 
-private const val SUPPORT_EMAIL = "mynulkbr@gmail.com"
+private const val SUPPORT_EMAIL = "tanvirahmd565@gmail.com"
 private const val REPO_URL = "https://github.com/r-ahmd/Lyrra"
 private const val DEV_GITHUB = "mynulkbr"
 private const val CO_DEV_GITHUB = "tnbr-ahmd"

@@ -46,7 +46,9 @@ Welcome to the biggest update to MuseFlow yet! **v1.1.1 Beta** introduces a mass
 * **Android 13+ Support & Compatibility**: project updated to target SDK 33 with compatibility fixes for Android 13 behavior changes (notifications, new permission flows, foreground service updates). Ensures smooth installs and runtime permission handling on Android 13 and newer.
 
 ### 🛠️ Miscellaneous
+* Fixed an issue where "Fans also like" / related artists were not showing when opening an artist page due to title parsing on InnerTube artist item renderers.
 * Dependency updates: bump Compose, Media3, and Retrofit to recent stable releases for better performance and security.
 * Improved image decoding and memory handling in album art pipeline to reduce OOM risk on lower-RAM devices.
 * Fixed several small crashes around download resumption and notification action handling.
+
 

@@ -12,28 +12,62 @@ import android.content.Context
  */
 class MusicSearchRouter(private val context: Context) {
 
-    suspend fun searchTracks(query: String): List<TrackResult> =
+    suspend fun searchTracks(query: String): SearchResults<TrackResult> =
         when (StreamResolverRouter.activeBackend(context)) {
             ExtractorBackend.INNERTUBE -> InnerTubeMusicProvider(context).search(query)
             ExtractorBackend.LEGACY -> YouTubeMusicProvider(context).search(query)
         }
 
-    suspend fun searchAlbums(query: String): List<AlbumResult> =
+    suspend fun searchTracksContinuation(continuation: String): SearchResults<TrackResult> =
+        when (StreamResolverRouter.activeBackend(context)) {
+            ExtractorBackend.INNERTUBE -> InnerTubeMusicProvider(context).searchContinuation(continuation)
+            ExtractorBackend.LEGACY -> SearchResults(items = emptyList(), continuation = null)
+        }
+
+    suspend fun searchAlbums(query: String): SearchResults<AlbumResult> =
         when (StreamResolverRouter.activeBackend(context)) {
             ExtractorBackend.INNERTUBE -> InnerTubeMusicProvider(context).searchAlbums(query)
-            ExtractorBackend.LEGACY -> YouTubeMusicProvider(context).searchAlbums(query)
+            ExtractorBackend.LEGACY -> {
+                // Legacy doesn't support Album filter directly in searchCategories
+                val results = YouTubeMusicProvider(context).searchAlbums(query)
+                SearchResults(items = results, continuation = null)
+            }
         }
 
-    suspend fun searchArtists(query: String): List<ArtistResult> =
+    suspend fun searchAlbumsContinuation(continuation: String): SearchResults<AlbumResult> =
+        when (StreamResolverRouter.activeBackend(context)) {
+            ExtractorBackend.INNERTUBE -> InnerTubeMusicProvider(context).searchAlbumsContinuation(continuation)
+            ExtractorBackend.LEGACY -> SearchResults(items = emptyList(), continuation = null)
+        }
+
+    suspend fun searchArtists(query: String): SearchResults<ArtistResult> =
         when (StreamResolverRouter.activeBackend(context)) {
             ExtractorBackend.INNERTUBE -> InnerTubeMusicProvider(context).searchArtists(query)
-            ExtractorBackend.LEGACY -> YouTubeMusicProvider(context).searchArtists(query)
+            ExtractorBackend.LEGACY -> {
+                val results = YouTubeMusicProvider(context).searchArtists(query)
+                SearchResults(items = results, continuation = null)
+            }
         }
 
-    suspend fun searchPlaylists(query: String): List<PlaylistResult> =
+    suspend fun searchArtistsContinuation(continuation: String): SearchResults<ArtistResult> =
+        when (StreamResolverRouter.activeBackend(context)) {
+            ExtractorBackend.INNERTUBE -> InnerTubeMusicProvider(context).searchArtistsContinuation(continuation)
+            ExtractorBackend.LEGACY -> SearchResults(items = emptyList(), continuation = null)
+        }
+
+    suspend fun searchPlaylists(query: String): SearchResults<PlaylistResult> =
         when (StreamResolverRouter.activeBackend(context)) {
             ExtractorBackend.INNERTUBE -> InnerTubeMusicProvider(context).searchPlaylists(query)
-            ExtractorBackend.LEGACY -> YouTubeMusicProvider(context).searchPlaylists(query)
+            ExtractorBackend.LEGACY -> {
+                val results = YouTubeMusicProvider(context).searchPlaylists(query)
+                SearchResults(items = results, continuation = null)
+            }
+        }
+
+    suspend fun searchPlaylistsContinuation(continuation: String): SearchResults<PlaylistResult> =
+        when (StreamResolverRouter.activeBackend(context)) {
+            ExtractorBackend.INNERTUBE -> InnerTubeMusicProvider(context).searchPlaylistsContinuation(continuation)
+            ExtractorBackend.LEGACY -> SearchResults(items = emptyList(), continuation = null)
         }
 
     /**

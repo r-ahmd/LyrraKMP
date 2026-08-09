@@ -149,12 +149,21 @@ data class StreamResolution(
 )
 
 /**
+ * Results of a search, including an optional continuation token for paging.
+ */
+data class SearchResults<T>(
+    val items: List<T>,
+    val continuation: String? = null
+)
+
+/**
  * Common contract for a music search + stream-resolution backend, so callers (like the player)
  * can treat online and on-device sources interchangeably.
  */
 interface Provider<T> {
     val name: String
-    suspend fun search(query: String): List<T>
+    suspend fun search(query: String): SearchResults<T>
+    suspend fun searchContinuation(continuation: String): SearchResults<T>
     suspend fun getStreamUrl(item: T): StreamResolution?
 }
 

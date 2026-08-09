@@ -84,8 +84,8 @@ class YouTubeMusicProvider(context: Context) : Provider<TrackResult> {
      * additionally requires a real videoId to accept a row at all, as a second line of defense
      * against a mis-bucketed non-song row slipping through.
      */
-    override suspend fun search(query: String): List<TrackResult> = withContext(Dispatchers.IO) {
-        searchAllCategories(query)
+    override suspend fun search(query: String): SearchResults<TrackResult> = withContext(Dispatchers.IO) {
+        val items = searchAllCategories(query)
             .filter { categoryOf(it) !in Category.NON_SONG }
             .mapNotNull { parseSongRenderer(it) }
             .map {
@@ -99,6 +99,12 @@ class YouTubeMusicProvider(context: Context) : Provider<TrackResult> {
                     imageUrl = it.thumbnailUrl
                 )
             }
+        SearchResults(items = items, continuation = null)
+    }
+
+    override suspend fun searchContinuation(continuation: String): SearchResults<TrackResult> = withContext(Dispatchers.IO) {
+        // Legacy backend doesn't easily support search continuation in its current simplified form
+        SearchResults(items = emptyList(), continuation = null)
     }
 
     /**

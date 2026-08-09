@@ -101,6 +101,7 @@ fun SearchScreen(
     val artists by viewModel.artists.collectAsState()
     val searchedPlaylists by viewModel.playlists.collectAsState()
     val suggestions by viewModel.suggestions.collectAsState()
+    val isLoadingMore by viewModel.isLoadingMore.collectAsState()
     val hasSearched by viewModel.hasSearched.collectAsState()
     val recentQueries by viewModel.recentQueries.collectAsState(initial = emptyList())
     val keyboard = LocalSoftwareKeyboardController.current
@@ -254,6 +255,8 @@ fun SearchScreen(
                                 downloadsInProgress = downloadsInProgress,
                                 onOpenMenu = { track -> selectedTrack = track },
                                 selection = selection,
+                                isLoadingMore = isLoadingMore,
+                                onLoadMore = viewModel::loadMore,
                             )
 
                             SearchFilter.Albums -> CollectionResults(
@@ -270,6 +273,8 @@ fun SearchScreen(
                                 imageUrl = AlbumResult::imageUrl,
                                 // Full navigation, not a modal sheet - same reasoning as Artist below.
                                 onOpen = { album -> onGoToAlbum(album.id) },
+                                isLoadingMore = isLoadingMore,
+                                onLoadMore = viewModel::loadMore,
                             )
 
                             SearchFilter.Artists -> CollectionResults(
@@ -283,6 +288,8 @@ fun SearchScreen(
                                 // kinds use - an artist has a real destination screen (with its own
                                 // tabs) to go to, unlike a song/album/playlist result.
                                 onOpen = { artist -> onGoToArtist(artist.id) },
+                                isLoadingMore = isLoadingMore,
+                                onLoadMore = viewModel::loadMore,
                             )
 
                             SearchFilter.Playlists -> CollectionResults(
@@ -300,6 +307,8 @@ fun SearchScreen(
                                 onOpen = { playlist ->
                                     onGoToPlaylist(playlist.id, playlist.title, playlist.subtitle, playlist.imageUrl)
                                 },
+                                isLoadingMore = isLoadingMore,
+                                onLoadMore = viewModel::loadMore,
                             )
                         }
                     }
@@ -346,10 +355,15 @@ private fun TrackResults(
     downloadsInProgress: Map<String, Int>,
     onOpenMenu: (TrackResult) -> Unit,
     selection: TrackSelection,
+    isLoadingMore: Boolean,
+    onLoadMore: () -> Unit,
 ) {
     ResultsFrame(results, emptyMessage) { tracks ->
         LazyColumn(contentPadding = PaddingValues(bottom = 120.dp)) {
             itemsIndexed(tracks, key = { index, track -> "$index-${track.id}" }) { index, track ->
+                if (index == tracks.size - 1) {
+                    LaunchedEffect(Unit) { onLoadMore() }
+                }
                 val key = track.toPlayableTrack(0).downloadKey()
                 TrackRow(
                     title = track.title,
@@ -368,6 +382,9 @@ private fun TrackResults(
                     downloadProgress = downloadsInProgress[key],
                     onOpenMenu = if (selection.active) null else { { onOpenMenu(track) } },
                 )
+            }
+            if (isLoadingMore) {
+                item { LoadingMoreIndicator() }
             }
         }
     }
@@ -388,12 +405,17 @@ private fun <T> CollectionResults(
     subtitle: (T) -> String,
     imageUrl: (T) -> String?,
     onOpen: (T) -> Unit,
+    isLoadingMore: Boolean,
+    onLoadMore: () -> Unit,
 ) {
     ResultsFrame(results, emptyMessage) { items ->
         LazyColumn(contentPadding = PaddingValues(bottom = 120.dp)) {
             // Position-based keys: YouTube can return the same browseId twice in one result set,
             // and a repeated Compose key is a crash rather than a cosmetic glitch.
-            itemsIndexed(items, key = { index, _ -> index }) { _, item ->
+            itemsIndexed(items, key = { index, _ -> index }) { index, item ->
+                if (index == items.size - 1) {
+                    LaunchedEffect(Unit) { onLoadMore() }
+                }
                 CollectionRow(
                     title = title(item),
                     subtitle = subtitle(item),
@@ -402,7 +424,20 @@ private fun <T> CollectionResults(
                     onClick = { onOpen(item) },
                 )
             }
+            if (isLoadingMore) {
+                item { LoadingMoreIndicator() }
+            }
         }
+    }
+}
+
+@Composable
+private fun LoadingMoreIndicator() {
+    Box(
+        modifier = Modifier.fillMaxWidth().padding(16.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        CircularProgressIndicator(modifier = Modifier.size(24.dp))
     }
 }
 

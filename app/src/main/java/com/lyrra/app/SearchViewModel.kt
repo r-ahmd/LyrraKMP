@@ -79,6 +79,11 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
     private val _suggestions = MutableStateFlow<List<String>>(emptyList())
     val suggestions: StateFlow<List<String>> = _suggestions.asStateFlow()
 
+    private val _isLoadingMore = MutableStateFlow(false)
+    val isLoadingMore: StateFlow<Boolean> = _isLoadingMore.asStateFlow()
+
+    private val continuations = mutableMapOf<SearchFilter, String?>()
+
     /** Whether a query has actually been run, so the screen can tell "nothing searched yet" from
      * "searched, and this filter genuinely has no matches" - which read identically before, both
      * being an empty list. */
@@ -126,7 +131,9 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         _hasSearched.value = true
         // A new query invalidates every tab, including the ones not currently visible.
         loadedFor.clear()
+        continuations.clear()
         history.record(trimmed)
+        Analytics.logSearch(trimmed)
 
         runSearch(trimmed, _filter.value)
     }
@@ -151,10 +158,10 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
             _activeBackend.value = StreamResolverRouter.activeBackend(getApplication())
 
             val succeeded = when (filter) {
-                SearchFilter.Songs -> load(_results) { router.searchTracks(query) }
-                SearchFilter.Albums -> load(_albums) { router.searchAlbums(query) }
-                SearchFilter.Artists -> load(_artists) { router.searchArtists(query) }
-                SearchFilter.Playlists -> load(_playlists) { router.searchPlaylists(query) }
+                SearchFilter.Songs -> load(_results, filter) { router.searchTracks(query) }
+                SearchFilter.Albums -> load(_albums, filter) { router.searchAlbums(query) }
+                SearchFilter.Artists -> load(_artists, filter) { router.searchArtists(query) }
+                SearchFilter.Playlists -> load(_playlists, filter) { router.searchPlaylists(query) }
             }
 
             // Only a success is worth remembering - a failed tab should retry when revisited.
@@ -162,15 +169,53 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun loadMore() {
+        val filter = _filter.value
+        val continuation = continuations[filter] ?: return
+        if (_isLoadingMore.value) return
+
+        _isLoadingMore.value = true
+        viewModelScope.launch {
+            val result: SearchResults<*>? = runCatching {
+                when (filter) {
+                    SearchFilter.Songs -> router.searchTracksContinuation(continuation)
+                    SearchFilter.Albums -> router.searchAlbumsContinuation(continuation)
+                    SearchFilter.Artists -> router.searchArtistsContinuation(continuation)
+                    SearchFilter.Playlists -> router.searchPlaylistsContinuation(continuation)
+                }
+            }.getOrNull()
+
+            if (result != null) {
+                continuations[filter] = result.continuation
+                when (filter) {
+                    SearchFilter.Songs -> _results.append(result.items as List<TrackResult>)
+                    SearchFilter.Albums -> _albums.append(result.items as List<AlbumResult>)
+                    SearchFilter.Artists -> _artists.append(result.items as List<ArtistResult>)
+                    SearchFilter.Playlists -> _playlists.append(result.items as List<PlaylistResult>)
+                }
+            }
+            _isLoadingMore.value = false
+        }
+    }
+
+    private fun <T> MutableStateFlow<UiState<List<T>>>.append(newItems: List<T>) {
+        val current = value
+        if (current is UiState.Success) {
+            value = UiState.Success(current.data + newItems)
+        }
+    }
+
     /** Drives one result flow through loading -> success/error, reporting whether it succeeded. */
     private suspend fun <T> load(
         state: MutableStateFlow<UiState<List<T>>>,
-        fetch: suspend () -> List<T>,
+        filter: SearchFilter,
+        fetch: suspend () -> SearchResults<T>,
     ): Boolean {
         state.value = UiState.Loading
         return runCatching { fetch() }.fold(
             onSuccess = {
-                state.value = UiState.Success(it)
+                state.value = UiState.Success(it.items)
+                continuations[filter] = it.continuation
                 true
             },
             onFailure = {
@@ -202,6 +247,7 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         committedQuery = ""
         _hasSearched.value = false
         loadedFor.clear()
+        continuations.clear()
         _results.value = UiState.Success(emptyList())
         _albums.value = UiState.Success(emptyList())
         _artists.value = UiState.Success(emptyList())

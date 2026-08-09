@@ -107,6 +107,7 @@ class DownloadRepository private constructor(context: Context) {
                     )
                 )
                 DownloadNotificationHelper.showCompleted(appContext, track)
+                Analytics.logTrackDownloaded(track.sourceId ?: key, track.title)
             } catch (e: CancellationException) {
                 // A user-initiated cancel (see cancelDownload) - not a failure, just clean up
                 // the partial file below and let the cancellation propagate as normal.
@@ -162,7 +163,7 @@ class DownloadRepository private constructor(context: Context) {
 
         val query = "${track.title} ${track.artist}"
         return runCatching {
-            val match = YouTubeMusicProvider(appContext).search(query).firstOrNull()
+            val match = YouTubeMusicProvider(appContext).search(query).items.firstOrNull()
             match?.let { StreamResolverRouter.resolve(appContext, it.id) }
         }.getOrNull()
     }

@@ -39,10 +39,13 @@ class TrackActionsViewModel(application: Application) : AndroidViewModel(applica
 
     fun toggleLike(track: Track) {
         viewModelScope.launch {
-            if (likedKeys.value.contains(track.downloadKey())) {
+            val key = track.downloadKey()
+            if (likedKeys.value.contains(key)) {
                 likedRepository.unlike(track)
+                Analytics.logTrackLiked(track.sourceId ?: key, track.title, false)
             } else {
                 likedRepository.like(track)
+                Analytics.logTrackLiked(track.sourceId ?: key, track.title, true)
             }
         }
     }
@@ -58,11 +61,15 @@ class TrackActionsViewModel(application: Application) : AndroidViewModel(applica
         viewModelScope.launch {
             tracks.forEach { track ->
                 if (liked) likedRepository.like(track) else likedRepository.unlike(track)
+                Analytics.logTrackLiked(track.sourceId ?: track.downloadKey(), track.title, liked)
             }
         }
     }
 
-    fun download(track: Track) = downloadRepository.startDownload(track)
+    fun download(track: Track) {
+        downloadRepository.startDownload(track)
+        Analytics.logTrackDownloaded(track.sourceId ?: track.downloadKey(), track.title)
+    }
 
     /**
      * Queues a download for each of [tracks].
@@ -70,7 +77,10 @@ class TrackActionsViewModel(application: Application) : AndroidViewModel(applica
      * Already-downloaded tracks are the caller's to filter - the repository treats a repeat as a
      * fresh download, so the bar drops them before calling.
      */
-    fun downloadAll(tracks: List<Track>) = tracks.forEach(downloadRepository::startDownload)
+    fun downloadAll(tracks: List<Track>) = tracks.forEach { track ->
+        downloadRepository.startDownload(track)
+        Analytics.logTrackDownloaded(track.sourceId ?: track.downloadKey(), track.title)
+    }
 
     fun cancelDownload(track: Track) = downloadRepository.cancelDownload(track)
 

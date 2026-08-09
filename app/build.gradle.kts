@@ -17,8 +17,8 @@ android {
     applicationId = "com.lyrra.app"
     minSdk = 30
     targetSdk = 35
-    versionCode = 2
-    versionName = "1.0.0"
+    versionCode = 5
+    versionName = "1.0.3"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -35,12 +35,17 @@ android {
 
   buildTypes {
     release {
-      isCrunchPngs = false
-      isMinifyEnabled = false
+      isCrunchPngs = true
+      isMinifyEnabled = true
+      isShrinkResources = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      signingConfig = signingConfigs.getByName("release")
+      signingConfig = signingConfigs.getByName("debug")
     }
-    debug { }
+    debug {
+      isMinifyEnabled = true
+      isShrinkResources = true
+      proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+    }
   }
   compileOptions {
     isCoreLibraryDesugaringEnabled = true
@@ -103,9 +108,11 @@ dependencies {
   implementation(libs.androidx.palette.ktx)
   implementation(libs.material.kolor)
   implementation(project(":innertube"))
+  implementation(project(":shared"))
   coreLibraryDesugaring(libs.desugaring)
   implementation(libs.converter.moshi)
   implementation(libs.firebase.ai)
+  implementation(libs.firebase.analytics)
   // Uncomment to use Firestore:
   // implementation(libs.firebase.firestore)
 

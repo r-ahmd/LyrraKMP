@@ -101,8 +101,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val _communityPlaylists = MutableStateFlow<UiState<List<PlaylistResult>>>(UiState.Loading)
     val communityPlaylists: StateFlow<UiState<List<PlaylistResult>>> = _communityPlaylists.asStateFlow()
 
+    private val _relatedArtists = MutableStateFlow<UiState<List<ArtistResult>>>(UiState.Loading)
+    val relatedArtists: StateFlow<UiState<List<ArtistResult>>> = _relatedArtists.asStateFlow()
+
     private var dailyDiscoverLoaded = false
     private var communityPlaylistsLoaded = false
+    private var relatedArtistsLoaded = false
 
     init {
         // Re-fetch whenever the user's top artists change (taste drift, or history existing for
@@ -130,9 +134,16 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             topArtists.collect { artists ->
                 if (artists.isEmpty()) {
                     _communityPlaylists.value = UiState.Success(emptyList())
-                } else if (!communityPlaylistsLoaded) {
-                    communityPlaylistsLoaded = true
-                    loadCommunityPlaylists(artists)
+                    _relatedArtists.value = UiState.Success(emptyList())
+                } else {
+                    if (!communityPlaylistsLoaded) {
+                        communityPlaylistsLoaded = true
+                        loadCommunityPlaylists(artists)
+                    }
+                    if (!relatedArtistsLoaded) {
+                        relatedArtistsLoaded = true
+                        loadRelatedArtists(artists)
+                    }
                 }
             }
         }
@@ -142,8 +153,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         loadShelves(shelfSpecs.value, forceRefresh = true)
         dailyDiscoverLoaded = false
         communityPlaylistsLoaded = false
+        relatedArtistsLoaded = false
         likedSongs.value.takeIf { it.isNotEmpty() }?.let { loadDailyDiscover(it) }
-        topArtists.value.takeIf { it.isNotEmpty() }?.let { loadCommunityPlaylists(it) }
+        topArtists.value.takeIf { it.isNotEmpty() }?.let { 
+            loadCommunityPlaylists(it)
+            loadRelatedArtists(it)
+        }
     }
 
     private fun loadDailyDiscover(liked: List<Track>) {
@@ -164,11 +179,27 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         _communityPlaylists.value = UiState.Loading
         viewModelScope.launch {
             val results = artists.flatMap { artist ->
-                runCatching { searchRouter.searchPlaylists(artist) }.getOrDefault(emptyList()).take(3)
+                runCatching { searchRouter.searchPlaylists(artist).items }.getOrDefault(emptyList()).take(3)
             }
             _communityPlaylists.value = UiState.Success(results.distinctBy { it.id }.take(15))
         }
     }
+
+    private fun loadRelatedArtists(artists: List<String>) {
+        _relatedArtists.value = UiState.Loading
+        viewModelScope.launch {
+            val results = artists.flatMap { artist ->
+                runCatching {
+                    val searchResults = searchRouter.searchArtists(artist).items
+                    val firstArtistId = searchResults.firstOrNull()?.id ?: return@runCatching emptyList<ArtistResult>()
+                    val related = searchRouter.getArtistTracklist(firstArtistId).relatedArtists
+                    if (related.isNotEmpty()) related else searchResults.drop(1).take(3)
+                }.getOrDefault(emptyList()).take(3)
+            }
+            _relatedArtists.value = UiState.Success(results.distinctBy { it.id }.take(15))
+        }
+    }
+
 
     private fun loadShelves(specs: List<HomeShelfSpec>, forceRefresh: Boolean) {
         specs.forEach { spec ->
@@ -183,11 +214,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     _shelves.update(spec.title, UiState.Success(cached))
                 }
 
-                val fresh = runCatching { searchRouter.searchTracks(spec.query) }.getOrNull()
+                val fresh = runCatching { searchRouter.searchTracks(spec.query).items }.getOrNull()
                     ?.map { it.toPlayableTrack(spec.title.hashCode()) }
 
                 when {
-                    !fresh.isNullOrEmpty() -> {
+                    fresh != null && fresh.isNotEmpty() -> {
                         _shelves.update(spec.title, UiState.Success(fresh))
                         runCatching {
                             shelfCacheDao.upsert(
@@ -214,5 +245,4 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         value = value.toMutableMap().apply { put(title, state) }
     }
 
-    fun recordPlayed(track: Track) = historyRepository.recordPlayed(track)
 }

@@ -11,8 +11,8 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Android-13%2B-green?logo=android" alt="Android 13+"/>
-  <img src="https://img.shields.io/badge/Kotlin-2.1-purple?logo=kotlin" alt="Kotlin"/>
+  <img src="https://img.shields.io/badge/Android-11%2B-green?logo=android" alt="Android 11+"/>
+  <img src="https://img.shields.io/badge/Kotlin-2.4-purple?logo=kotlin" alt="Kotlin"/>
   <img src="https://img.shields.io/badge/Jetpack_Compose-Material3-blue?logo=jetpackcompose" alt="Jetpack Compose"/>
   <img src="https://img.shields.io/badge/License-GPLv3-red" alt="License GPLv3"/>
 </p>
@@ -51,7 +51,7 @@
 
 ## 📋 Requirements
 
-- Android **13+** (API 33)
+- Android **11+** (API 30)
 - Android Studio **Ladybug** or later
 - JDK **17** (JDK 21 required for Robolectric tests)
 
@@ -101,16 +101,13 @@ Lyrra/
 │   └── src/main/java/com/lyrra/app/
 │       ├── MainActivity.kt              # App entry point
 │       ├── LyrraApplication.kt          # Application class
-│       ├── InnerTubeStreamResolver.kt   # HiFi stream resolver
-│       ├── YouTubeStreamResolver.kt     # Fallback stream resolver
-│       ├── ui/
-│       │   ├── component/
-│       │   │   └── MiniPlayer.kt        # Glassmorphic mini player
+│       ├── PlaybackService.kt           # Media3 playback service
+│       ├── HomeViewModel.kt             # Main discovery logic
+│       ├── ui/                          # UI components and screens
+│       │   ├── component/               # Reusable widgets
 │       │   ├── screens/                 # All app screens
 │       │   └── theme/                   # Material You theming
-│       ├── data/                        # Room database & DAOs
-│       ├── model/                       # Data models
-│       └── viewmodel/                   # ViewModels
+│       └── ...                          # Repositories, Providers, and DAOs
 ├── innertube/                           # YouTube InnerTube API module
 ├── gradle/                              # Gradle wrapper & version catalog
 └── LICENSE                              # GPLv3

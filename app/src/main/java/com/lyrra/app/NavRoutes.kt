@@ -26,6 +26,7 @@ object Routes {
     const val LIBRARY_STATS = "library/stats"
 
     const val NOW_PLAYING = "now_playing"
+    const val LISTEN_TOGETHER = "listen_together"
     const val HISTORY = "history"
     const val THEME_SETTINGS = "settings/theme"
     const val EQUALIZER = "settings/equalizer"

@@ -27,6 +27,7 @@ dependencyResolutionManagement {
 rootProject.name = "Lyrra"
 
 include(":app")
+include(":shared")
 
 // YouTube/InnerTube API client, ported from Echo-Music (GPL-3.0).
 include(":innertube")

@@ -112,10 +112,10 @@ class PlaylistImportViewModel(application: Application) : AndroidViewModel(appli
      */
     private suspend fun findMatch(csvTrack: CsvTrack): TrackResult? {
         val results = runCatching {
-            router.searchTracks("${csvTrack.title} ${csvTrack.artist}")
+            router.searchTracks("${csvTrack.title} ${csvTrack.artist}").items
         }.getOrNull().orEmpty()
 
-        return results.firstOrNull { candidate ->
+        return results.firstOrNull { candidate: TrackResult ->
             isLikelyMatch(csvTrack.title, csvTrack.artist, candidate.title, candidate.artist)
         }
     }

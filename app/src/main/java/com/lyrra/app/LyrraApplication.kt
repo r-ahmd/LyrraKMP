@@ -23,6 +23,8 @@ class LyrraApplication : Application(), ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
+        Analytics.init(this)
+        Analytics.logAppOpen()
         CrashHandler.install(this)
         YtHttpClients.init(this)
 

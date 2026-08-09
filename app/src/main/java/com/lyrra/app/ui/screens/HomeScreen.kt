@@ -45,6 +45,8 @@ import com.lyrra.app.GridCellSize
 import com.lyrra.app.HomeViewModel
 import com.lyrra.app.PlaylistEntity
 import com.lyrra.app.PlaylistResult
+import com.lyrra.app.ArtistResult
+import com.lyrra.app.Analytics
 import com.lyrra.app.Track
 import com.lyrra.app.TrackResult
 import com.lyrra.app.UiState
@@ -58,6 +60,8 @@ import com.lyrra.app.MusicSource
 fun HomeScreen(
     onPlayTrack: (TrackResult, List<TrackResult>) -> Unit = { _, _ -> },
     onOpenPlaylist: (Long) -> Unit = {},
+    onOpenArtist: (String) -> Unit = {},
+    onOpenBrowse: (String, String?) -> Unit = { _, _ -> },
     onOpenRemotePlaylist: (String, String, String, String?) -> Unit = { _, _, _, _ -> },
     modifier: Modifier = Modifier,
 ) {
@@ -80,6 +84,7 @@ fun HomeScreen(
     val playlists by viewModel.playlists.collectAsState()
     val dailyDiscover by viewModel.dailyDiscover.collectAsState()
     val communityPlaylists by viewModel.communityPlaylists.collectAsState()
+    val relatedArtists by viewModel.relatedArtists.collectAsState()
 
     // Home's local sections hold Track (from Room); playback takes TrackResult, so they're mapped
     // at the point of the tap rather than storing two parallel shapes everywhere.
@@ -168,6 +173,25 @@ fun HomeScreen(
             is UiState.Loading -> item { Shelf(title = "From the community") { ShelfSkeleton() } }
             is UiState.Error -> Unit
         }
+
+        when (relatedArtists) {
+            is UiState.Success -> {
+                val results = (relatedArtists as UiState.Success<List<ArtistResult>>).data
+                if (results.isNotEmpty()) {
+                    item {
+                        Shelf(title = "Fans also like") {
+                            ArtistCarousel(results, cardSize) { artist ->
+                                Analytics.logDiscoveryItemClicked("artist", artist.id, artist.name)
+                                onOpenArtist(artist.id)
+                            }
+                        }
+                    }
+                }
+            }
+            is UiState.Loading -> item { Shelf(title = "Fans also like") { ShelfSkeleton() } }
+            is UiState.Error -> Unit
+        }
+
 
         items(shelfSpecs, key = { it.title }) { spec ->
             Shelf(title = spec.title) {
@@ -296,6 +320,37 @@ private fun RemotePlaylistCarousel(
                     text = playlist.subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ArtistCarousel(
+    artists: List<ArtistResult>,
+    cardSize: androidx.compose.ui.unit.Dp,
+    onOpen: (ArtistResult) -> Unit,
+) {
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+    ) {
+        items(artists, key = { it.id }) { artist ->
+            Column(
+                modifier = Modifier
+                    .width(cardSize)
+                    .clickable { onOpen(artist) },
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Artwork(imageUrl = artist.imageUrl, size = cardSize, corner = cardSize / 2)
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = artist.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
