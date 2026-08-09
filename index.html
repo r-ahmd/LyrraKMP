@@ -163,29 +163,22 @@
     let currentRole = null;
     let currentRoomCode = "";
 
-    // Popular tracks — audio fetched fresh from iTunes API on each tap (no stale URLs)
+    // Popular tracks — full audio via /api/stream (InnerTube, same as Android app)
     const POPULAR_TRACKS = [
-      { title: "Blinding Lights",  artist: "The Weeknd",              artwork: "https://i.ytimg.com/vi/hT_nvWreI6o/hqdefault.jpg" },
-      { title: "Save Your Tears",  artist: "The Weeknd",              artwork: "https://i.ytimg.com/vi/0V3wOYp214k/hqdefault.jpg" },
-      { title: "Uptown Funk",      artist: "Mark Ronson Bruno Mars",  artwork: "https://i.ytimg.com/vi/OPf0YbXqDm0/hqdefault.jpg" },
-      { title: "Starboy",          artist: "The Weeknd",              artwork: "https://i.ytimg.com/vi/34Na4j8AVgA/hqdefault.jpg" },
-      { title: "Bohemian Rhapsody",artist: "Queen",                   artwork: "https://i.ytimg.com/vi/fJ9rUzIMcZQ/hqdefault.jpg" },
-      { title: "Despacito",        artist: "Luis Fonsi",              artwork: "https://i.ytimg.com/vi/kJQP7kiw5Fk/hqdefault.jpg" }
+      { id: "hT_nvWreI6o", title: "Blinding Lights",   artist: "The Weeknd",             artwork: "https://i.ytimg.com/vi/hT_nvWreI6o/maxresdefault.jpg" },
+      { id: "0V3wOYp214k", title: "Save Your Tears",   artist: "The Weeknd",             artwork: "https://i.ytimg.com/vi/0V3wOYp214k/maxresdefault.jpg" },
+      { id: "OPf0YbXqDm0", title: "Uptown Funk",        artist: "Mark Ronson ft. Bruno Mars", artwork: "https://i.ytimg.com/vi/OPf0YbXqDm0/maxresdefault.jpg" },
+      { id: "34Na4j8AVgA", title: "Starboy",             artist: "The Weeknd ft. Daft Punk",artwork: "https://i.ytimg.com/vi/34Na4j8AVgA/maxresdefault.jpg" },
+      { id: "fJ9rUzIMcZQ", title: "Bohemian Rhapsody",  artist: "Queen",                  artwork: "https://i.ytimg.com/vi/fJ9rUzIMcZQ/maxresdefault.jpg" },
+      { id: "kJQP7kiw5Fk", title: "Despacito",           artist: "Luis Fonsi",             artwork: "https://i.ytimg.com/vi/kJQP7kiw5Fk/maxresdefault.jpg" }
     ];
 
-    // Fetch a fresh preview URL from iTunes API each time
-    async function fetchFreshAudio(title, artist) {
-      try {
-        const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(title + ' ' + artist)}&entity=song&limit=1`);
-        const data = await res.json();
-        if (data.results && data.results.length > 0 && data.results[0].previewUrl) {
-          return {
-            audioUrl: data.results[0].previewUrl,
-            artwork:  data.results[0].artworkUrl100.replace('100x100', '600x600')
-          };
-        }
-      } catch (e) { console.warn('iTunes fetch error', e); }
-      return null;
+    // Resolve full audio stream from /api/stream (InnerTube server-side proxy)
+    async function resolveStream(videoId) {
+      const res = await fetch(`/api/stream?id=${videoId}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.url || null;
     }
 
     function initUI() {
@@ -230,16 +223,15 @@
         if (card) {
           card.onclick = async function() {
             currentTrackIndex = idx;
-            // Show loading state immediately
             setLoadingState(t.title, t.artist, t.artwork);
             openFullPlayer();
-            // Fetch fresh audio URL from iTunes
-            const fresh = await fetchFreshAudio(t.title, t.artist);
-            if (fresh) {
-              playSong(t.title, t.artist, fresh.artwork, fresh.audioUrl);
+            const audioUrl = await resolveStream(t.id);
+            if (audioUrl) {
+              playSong(t.title, t.artist, t.artwork, audioUrl);
             } else {
-              document.getElementById('full-track-title').textContent = 'Could not load. Try another song.';
+              document.getElementById('full-track-title').textContent = 'Stream unavailable. Try another.';
               clearLoadingState();
+            }
             }
           };
         }
@@ -299,39 +291,47 @@
     }
 
     async function performSearch() {
-      const input = document.getElementById("search-input");
-      const results = document.getElementById("search-results");
+      const input = document.getElementById('search-input');
+      const results = document.getElementById('search-results');
       if (!input || !results) return;
       const q = input.value.trim();
       if (!q) return;
 
-      results.innerHTML = `<div class="empty-state">Searching for "${q}"...</div>`;
+      results.innerHTML = `<div class="empty-state">🎵 Searching YouTube Music for "${q}"...</div>`;
 
       try {
-        const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&entity=song&limit=15`);
+        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
         const data = await res.json();
+
         if (!data.results || data.results.length === 0) {
-          results.innerHTML = `<div class="empty-state">No songs found.</div>`;
+          results.innerHTML = `<div class="empty-state">No songs found for "${q}"</div>`;
           return;
         }
 
         results.innerHTML = data.results.map((item, idx) => `
           <div class="list-item" id="search-item-${idx}">
-            <img src="${item.artworkUrl100}" class="list-thumb">
+            <img src="${item.thumbnail || 'https://i.ytimg.com/vi/' + item.videoId + '/hqdefault.jpg'}" class="list-thumb" onerror="this.src='https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg'">
             <div class="list-info">
-              <div class="track-card-title">${item.trackName}</div>
-              <div class="track-card-artist">${item.artistName}</div>
+              <div class="track-card-title">${item.title}</div>
+              <div class="track-card-artist">${item.artist}</div>
             </div>
           </div>
-        `).join("");
+        `).join('');
 
         data.results.forEach((item, idx) => {
           const el = document.getElementById(`search-item-${idx}`);
           if (el) {
-            el.onclick = function() {
-              const hqArt = item.artworkUrl100.replace('100x100', '600x600');
-              playSong(item.trackName, item.artistName, hqArt, item.previewUrl);
+            el.onclick = async function() {
+              const art = item.thumbnail || `https://i.ytimg.com/vi/${item.videoId}/maxresdefault.jpg`;
+              setLoadingState(item.title, item.artist, art);
               openFullPlayer();
+              const audioUrl = await resolveStream(item.videoId);
+              if (audioUrl) {
+                playSong(item.videoId, item.title, item.artist, art, audioUrl);
+              } else {
+                document.getElementById('full-track-title').textContent = 'Stream unavailable. Try another.';
+                clearLoadingState();
+              }
             };
           }
         });
