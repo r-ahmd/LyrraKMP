@@ -1,10 +1,13 @@
-// Lyrra PWA - InnerTube YouTube Music Engine & Supabase Realtime Sync
+// Lyrra Full Web PWA - Music Player & Listen Together Sync
 const SUPABASE_URL = "https://jzcnbbbzvsogkqkxdztm.supabase.co";
 const SUPABASE_KEY = "sb_publishable_enIYe3gEaqUcHp78L-VCFQ_K8G2dWtA";
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let supabase = null;
+if (window.supabase) {
+  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+}
 
-// Reliable InnerTube / Invidious CORS Proxy Endpoints for Full Song Streams
+// Invidious / Piped API Nodes
 const INVIDIOUS_NODES = [
   "https://invidious.nerdvpn.de",
   "https://inv.tux.pizza",
@@ -16,38 +19,10 @@ let currentTab = "tab-home";
 let currentTrack = null;
 let isPlaying = false;
 let currentChannel = null;
-let currentRole = null; // 'HOST' or 'LISTENER'
+let currentRole = null;
 let currentRoomCode = "";
 
-// DOM Elements
-const navItems = document.querySelectorAll(".nav-item");
-const tabPages = document.querySelectorAll(".tab-page");
-
-const homeGrid = document.getElementById("home-grid");
-const searchInput = document.getElementById("search-input");
-const btnSearchTrigger = document.getElementById("btn-search-trigger");
-const searchResults = document.getElementById("search-results");
-
-const audioElement = document.getElementById("audio-element");
-const playerArt = document.getElementById("player-art");
-const playerTitle = document.getElementById("player-title");
-const playerArtist = document.getElementById("player-artist");
-const btnPlayPause = document.getElementById("btn-play-pause");
-
-const statusDot = document.getElementById("status-dot");
-const statusText = document.getElementById("status-text");
-
-const togetherSetup = document.getElementById("together-setup");
-const togetherActive = document.getElementById("together-active");
-const btnCreateRoom = document.getElementById("btn-create-room");
-const btnJoinRoom = document.getElementById("btn-join-room");
-const btnLeaveRoom = document.getElementById("btn-leave-room");
-const inputRoomCode = document.getElementById("input-room-code");
-const displayRoomCode = document.getElementById("display-room-code");
-const roomRoleBadge = document.getElementById("room-role-badge");
-const presenceCount = document.getElementById("presence-count");
-
-// Popular / Trending YouTube Music Tracks
+// Popular Tracks Data
 const POPULAR_TRACKS = [
   {
     id: "hT_nvWreI6o",
@@ -87,7 +62,7 @@ const POPULAR_TRACKS = [
   }
 ];
 
-// App Init
+// DOM Load
 document.addEventListener("DOMContentLoaded", () => {
   renderHomeGrid();
   setupNavigation();
@@ -101,21 +76,40 @@ document.addEventListener("DOMContentLoaded", () => {
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
   const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
   if (isIOS && !isStandalone) {
-    document.getElementById("ios-pwa-prompt").classList.remove("hidden");
+    const prompt = document.getElementById("ios-pwa-prompt");
+    if (prompt) prompt.classList.remove("hidden");
   }
 });
 
+// Render Home Grid
 function renderHomeGrid() {
+  const homeGrid = document.getElementById("home-grid");
+  if (!homeGrid) return;
+
   homeGrid.innerHTML = POPULAR_TRACKS.map(track => `
-    <div class="track-card" onclick="playYouTubeTrack('${track.id}', '${escapeHtml(track.title)}', '${escapeHtml(track.artist)}', '${track.artwork}')">
+    <div class="track-card" data-id="${track.id}">
       <img src="${track.artwork}" class="track-cover" alt="${escapeHtml(track.title)}" loading="lazy">
       <div class="track-card-title">${escapeHtml(track.title)}</div>
       <div class="track-card-artist">${escapeHtml(track.artist)}</div>
     </div>
   `).join("");
+
+  homeGrid.querySelectorAll(".track-card").forEach(card => {
+    card.addEventListener("click", () => {
+      const id = card.getAttribute("data-id");
+      const track = POPULAR_TRACKS.find(t => t.id === id);
+      if (track) {
+        window.playYouTubeTrack(track.id, track.title, track.artist, track.artwork);
+      }
+    });
+  });
 }
 
+// Navigation Tabs Setup
 function setupNavigation() {
+  const navItems = document.querySelectorAll(".nav-item");
+  const tabPages = document.querySelectorAll(".tab-page");
+
   navItems.forEach(item => {
     item.addEventListener("click", () => {
       const targetTab = item.getAttribute("data-tab");
@@ -123,94 +117,117 @@ function setupNavigation() {
       tabPages.forEach(p => p.classList.add("hidden"));
 
       item.classList.add("active");
-      document.getElementById(targetTab).classList.remove("hidden");
+      const page = document.getElementById(targetTab);
+      if (page) page.classList.remove("hidden");
       currentTab = targetTab;
     });
   });
 
-  btnSearchTrigger.addEventListener("click", performSearch);
-  searchInput.addEventListener("keypress", (e) => {
-    if (e.key === "Enter") performSearch();
-  });
+  const btnSearchTrigger = document.getElementById("btn-search-trigger");
+  const searchInput = document.getElementById("search-input");
+
+  if (btnSearchTrigger) {
+    btnSearchTrigger.addEventListener("click", performSearch);
+  }
+  if (searchInput) {
+    searchInput.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") performSearch();
+    });
+  }
 }
 
-// Search YouTube Music via InnerTube/Invidious Engine
+// Search YouTube Music via Invidious / iTunes
 async function performSearch() {
+  const searchInput = document.getElementById("search-input");
+  const searchResults = document.getElementById("search-results");
+  if (!searchInput || !searchResults) return;
+
   const query = searchInput.value.trim();
   if (!query) return;
 
-  searchResults.innerHTML = `<div class="empty-state">Searching YouTube Music for "${escapeHtml(query)}"...</div>`;
+  searchResults.innerHTML = `<div class="empty-state">Searching for "${escapeHtml(query)}"...</div>`;
 
-  let items = null;
-  for (const node of INVIDIOUS_NODES) {
-    try {
-      const res = await fetch(`${node}/api/v1/search?q=${encodeURIComponent(query)}&type=video`);
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        items = data;
-        break;
-      }
-    } catch (e) {
-      console.warn("Node failed, trying next node:", node);
+  try {
+    const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&entity=song&limit=15`);
+    const data = await res.json();
+
+    if (!data.results || data.results.length === 0) {
+      searchResults.innerHTML = `<div class="empty-state">No songs found for "${escapeHtml(query)}"</div>`;
+      return;
     }
-  }
 
-  if (!items) {
-    searchResults.innerHTML = `<div class="empty-state">No songs found. Please try another search term.</div>`;
-    return;
-  }
-
-  searchResults.innerHTML = items.slice(0, 15).map(item => {
-    const art = item.videoThumbnails ? item.videoThumbnails[0].url : `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg`;
-    return `
-      <div class="list-item" onclick="playYouTubeTrack('${item.videoId}', '${escapeHtml(item.title)}', '${escapeHtml(item.author)}', '${art}')">
-        <img src="${art}" class="list-thumb" alt="art">
+    searchResults.innerHTML = data.results.map(item => `
+      <div class="list-item" data-id="${item.trackId}" data-title="${escapeHtml(item.trackName)}" data-artist="${escapeHtml(item.artistName)}" data-art="${item.artworkUrl100}" data-preview="${item.previewUrl}">
+        <img src="${item.artworkUrl100}" class="list-thumb" alt="art">
         <div class="list-info">
-          <div class="track-card-title">${escapeHtml(item.title)}</div>
-          <div class="track-card-artist">${escapeHtml(item.author)}</div>
+          <div class="track-card-title">${escapeHtml(item.trackName)}</div>
+          <div class="track-card-artist">${escapeHtml(item.artistName)}</div>
         </div>
       </div>
-    `;
-  }).join("");
+    `).join("");
+
+    searchResults.querySelectorAll(".list-item").forEach(item => {
+      item.addEventListener("click", () => {
+        const id = item.getAttribute("data-id");
+        const title = item.getAttribute("data-title");
+        const artist = item.getAttribute("data-artist");
+        const art = item.getAttribute("data-art");
+        const preview = item.getAttribute("data-preview");
+        window.playYouTubeTrack(id, title, artist, art, 0, preview);
+      });
+    });
+  } catch (err) {
+    console.error("Search error:", err);
+    searchResults.innerHTML = `<div class="empty-state">Search error. Please try again.</div>`;
+  }
 }
 
-// Play Full YouTube Song Audio Stream
-async function playYouTubeTrack(videoId, title, artist, artwork, seekMs = 0) {
+// Global Play Function
+window.playYouTubeTrack = async function(videoId, title, artist, artwork, seekMs = 0, previewUrl = null) {
   currentTrack = { id: videoId, title, artist, artwork };
 
-  playerTitle.textContent = title;
-  playerArtist.textContent = artist;
-  playerArt.src = artwork || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+  const playerTitle = document.getElementById("player-title");
+  const playerArtist = document.getElementById("player-artist");
+  const playerArt = document.getElementById("player-art");
+  const audioElement = document.getElementById("audio-element");
+  const btnPlayPause = document.getElementById("btn-play-pause");
+  const statusText = document.getElementById("status-text");
 
-  statusText.textContent = "Loading stream...";
+  if (playerTitle) playerTitle.textContent = title;
+  if (playerArtist) playerArtist.textContent = artist;
+  if (playerArt) playerArt.src = artwork || "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=150";
 
-  let audioUrl = null;
-  for (const node of INVIDIOUS_NODES) {
-    try {
-      const res = await fetch(`${node}/api/v1/videos/${videoId}`);
-      const data = await res.json();
-      if (data.adaptiveFormats) {
-        // Find best audio stream format (webm or m4a)
-        const audioFormat = data.adaptiveFormats.find(f => f.type && f.type.startsWith("audio/"));
-        if (audioFormat && audioFormat.url) {
-          audioUrl = audioFormat.url;
-          break;
+  if (statusText) statusText.textContent = "Loading stream...";
+
+  let audioUrl = previewUrl;
+
+  if (!audioUrl) {
+    for (const node of INVIDIOUS_NODES) {
+      try {
+        const res = await fetch(`${node}/api/v1/videos/${videoId}`);
+        const data = await res.json();
+        if (data.adaptiveFormats) {
+          const audioFormat = data.adaptiveFormats.find(f => f.type && f.type.startsWith("audio/"));
+          if (audioFormat && audioFormat.url) {
+            audioUrl = audioFormat.url;
+            break;
+          }
         }
+      } catch (e) {
+        console.warn("Stream resolution failed on node:", node);
       }
-    } catch (e) {
-      console.warn("Stream resolution failed on node:", node);
     }
   }
 
-  if (audioUrl) {
+  if (audioUrl && audioElement) {
     audioElement.src = audioUrl;
     if (seekMs > 0) audioElement.currentTime = seekMs / 1000;
 
     try {
       await audioElement.play();
       isPlaying = true;
-      btnPlayPause.textContent = "⏸";
-      statusText.textContent = currentRole ? `Room ${currentRoomCode} (${currentRole})` : "Playing";
+      if (btnPlayPause) btnPlayPause.textContent = "⏸";
+      if (statusText) statusText.textContent = currentRole ? `Room ${currentRoomCode} (${currentRole})` : "Playing";
 
       if (currentRole === "HOST") {
         broadcastHostState();
@@ -218,55 +235,69 @@ async function playYouTubeTrack(videoId, title, artist, artwork, seekMs = 0) {
     } catch (err) {
       console.error("Audio play error:", err);
     }
-  } else {
-    alert("Unable to load full audio stream for this track. Try another song.");
   }
-}
+};
 
-// Audio Player Controls
+// Audio Controls
 function setupAudioPlayer() {
-  btnPlayPause.addEventListener("click", () => {
-    if (!audioElement.src) return;
+  const btnPlayPause = document.getElementById("btn-play-pause");
+  const audioElement = document.getElementById("audio-element");
 
-    if (isPlaying) {
-      audioElement.pause();
+  if (btnPlayPause && audioElement) {
+    btnPlayPause.addEventListener("click", () => {
+      if (!audioElement.src) return;
+
+      if (isPlaying) {
+        audioElement.pause();
+        isPlaying = false;
+        btnPlayPause.textContent = "▶";
+      } else {
+        audioElement.play();
+        isPlaying = true;
+        btnPlayPause.textContent = "⏸";
+      }
+
+      if (currentRole === "HOST") {
+        broadcastHostState();
+      }
+    });
+
+    audioElement.addEventListener("ended", () => {
       isPlaying = false;
       btnPlayPause.textContent = "▶";
-    } else {
-      audioElement.play();
-      isPlaying = true;
-      btnPlayPause.textContent = "⏸";
-    }
-
-    if (currentRole === "HOST") {
-      broadcastHostState();
-    }
-  });
-
-  audioElement.addEventListener("ended", () => {
-    isPlaying = false;
-    btnPlayPause.textContent = "▶";
-    if (currentRole === "HOST") broadcastHostState();
-  });
+      if (currentRole === "HOST") broadcastHostState();
+    });
+  }
 }
 
 // Listen Together Realtime Sync
 function setupListenTogether() {
-  btnCreateRoom.addEventListener("click", () => {
-    const code = generateRoomCode();
-    joinSession(code, "HOST");
-  });
+  const btnCreateRoom = document.getElementById("btn-create-room");
+  const btnJoinRoom = document.getElementById("btn-join-room");
+  const btnLeaveRoom = document.getElementById("btn-leave-room");
+  const inputRoomCode = document.getElementById("input-room-code");
 
-  btnJoinRoom.addEventListener("click", () => {
-    const code = inputRoomCode.value.trim().toUpperCase();
-    if (code.length === 6) {
-      joinSession(code, "LISTENER");
-    } else {
-      alert("Please enter a valid 6-character room code.");
-    }
-  });
+  if (btnCreateRoom) {
+    btnCreateRoom.addEventListener("click", () => {
+      const code = generateRoomCode();
+      joinSession(code, "HOST");
+    });
+  }
 
-  btnLeaveRoom.addEventListener("click", leaveSession);
+  if (btnJoinRoom && inputRoomCode) {
+    btnJoinRoom.addEventListener("click", () => {
+      const code = inputRoomCode.value.trim().toUpperCase();
+      if (code.length === 6) {
+        joinSession(code, "LISTENER");
+      } else {
+        alert("Please enter a valid 6-character room code.");
+      }
+    });
+  }
+
+  if (btnLeaveRoom) {
+    btnLeaveRoom.addEventListener("click", leaveSession);
+  }
 }
 
 function generateRoomCode() {
@@ -282,11 +313,20 @@ function joinSession(roomCode, role) {
   currentRoomCode = roomCode;
   currentRole = role;
 
-  displayRoomCode.textContent = roomCode;
-  roomRoleBadge.textContent = role;
+  const displayRoomCode = document.getElementById("display-room-code");
+  const roomRoleBadge = document.getElementById("room-role-badge");
+  const togetherSetup = document.getElementById("together-setup");
+  const togetherActive = document.getElementById("together-active");
+  const statusDot = document.getElementById("status-dot");
+  const statusText = document.getElementById("status-text");
 
-  togetherSetup.classList.add("hidden");
-  togetherActive.classList.remove("hidden");
+  if (displayRoomCode) displayRoomCode.textContent = roomCode;
+  if (roomRoleBadge) roomRoleBadge.textContent = role;
+
+  if (togetherSetup) togetherSetup.classList.add("hidden");
+  if (togetherActive) togetherActive.classList.remove("hidden");
+
+  if (!supabase) return;
 
   const topic = `realtime:${roomCode}`;
   currentChannel = supabase.channel(topic, {
@@ -305,12 +345,13 @@ function joinSession(roomCode, role) {
     .on('presence', { event: 'sync' }, () => {
       const state = currentChannel.presenceState();
       const count = Object.keys(state).length;
-      presenceCount.textContent = `${count} member(s) connected`;
+      const presenceCount = document.getElementById("presence-count");
+      if (presenceCount) presenceCount.textContent = `${count} member(s) connected`;
     })
     .subscribe((status) => {
       if (status === 'SUBSCRIBED') {
-        statusDot.classList.add("connected");
-        statusText.textContent = `Room ${roomCode} (${role})`;
+        if (statusDot) statusDot.classList.add("connected");
+        if (statusText) statusText.textContent = `Room ${roomCode} (${role})`;
         
         currentChannel.track({
           user: role === "HOST" ? "Host (Web)" : "Listener (Web)",
@@ -321,14 +362,15 @@ function joinSession(roomCode, role) {
           broadcastHostState();
         }
       } else {
-        statusDot.classList.remove("connected");
-        statusText.textContent = "Connecting...";
+        if (statusDot) statusDot.classList.remove("connected");
+        if (statusText) statusText.textContent = "Connecting...";
       }
     });
 }
 
 function broadcastHostState() {
   if (!currentChannel || currentRole !== "HOST" || !currentTrack) return;
+  const audioElement = document.getElementById("audio-element");
 
   currentChannel.send({
     type: 'broadcast',
@@ -338,7 +380,7 @@ function broadcastHostState() {
       track_title: currentTrack.title,
       track_artist: currentTrack.artist,
       track_image_url: currentTrack.artwork || "",
-      position_ms: Math.floor(audioElement.currentTime * 1000),
+      position_ms: audioElement ? Math.floor(audioElement.currentTime * 1000) : 0,
       is_playing: isPlaying,
       source_type: "yt",
       source_id: currentTrack.id
@@ -350,10 +392,12 @@ function applySyncPayload(payload) {
   const trackId = payload.track_id;
   const isHostPlaying = payload.is_playing;
   const positionMs = payload.position_ms || 0;
+  const audioElement = document.getElementById("audio-element");
+  const btnPlayPause = document.getElementById("btn-play-pause");
 
   if (!currentTrack || currentTrack.id !== trackId) {
-    playYouTubeTrack(trackId, payload.track_title, payload.track_artist, payload.track_image_url, positionMs);
-  } else {
+    window.playYouTubeTrack(trackId, payload.track_title, payload.track_artist, payload.track_image_url, positionMs);
+  } else if (audioElement) {
     const localMs = audioElement.currentTime * 1000;
     if (Math.abs(localMs - positionMs) > 2000) {
       audioElement.currentTime = positionMs / 1000;
@@ -362,17 +406,17 @@ function applySyncPayload(payload) {
     if (isHostPlaying && audioElement.paused) {
       audioElement.play();
       isPlaying = true;
-      btnPlayPause.textContent = "⏸";
+      if (btnPlayPause) btnPlayPause.textContent = "⏸";
     } else if (!isHostPlaying && !audioElement.paused) {
       audioElement.pause();
       isPlaying = false;
-      btnPlayPause.textContent = "▶";
+      if (btnPlayPause) btnPlayPause.textContent = "▶";
     }
   }
 }
 
 function leaveSession() {
-  if (currentChannel) {
+  if (currentChannel && supabase) {
     supabase.removeChannel(currentChannel);
     currentChannel = null;
   }
@@ -380,11 +424,16 @@ function leaveSession() {
   currentRole = null;
   currentRoomCode = "";
 
-  statusDot.classList.remove("connected");
-  statusText.textContent = "Solo";
+  const statusDot = document.getElementById("status-dot");
+  const statusText = document.getElementById("status-text");
+  const togetherActive = document.getElementById("together-active");
+  const togetherSetup = document.getElementById("together-setup");
 
-  togetherActive.classList.add("hidden");
-  togetherSetup.classList.remove("hidden");
+  if (statusDot) statusDot.classList.remove("connected");
+  if (statusText) statusText.textContent = "Solo";
+
+  if (togetherActive) togetherActive.classList.add("hidden");
+  if (togetherSetup) togetherSetup.classList.remove("hidden");
 }
 
 function escapeHtml(str) {
