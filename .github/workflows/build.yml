@@ -63,7 +63,8 @@ jobs:
           cp -R shared/build/bin/iosArm64/releaseFramework/SharedFramework.framework build/ios/Payload/Lyrra.app/Frameworks/
           
           cd iosApp
-          swift build -c release --triple arm64-apple-ios -Xswiftc "-F" -Xswiftc "../shared/build/bin/iosArm64/releaseFramework"
+          SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
+          xcrun -sdk iphoneos swift build -c release --triple arm64-apple-ios -Xswiftc "-sdk" -Xswiftc "$SDK_PATH" -Xswiftc "-F" -Xswiftc "../shared/build/bin/iosArm64/releaseFramework"
           
           cp .build/arm64-apple-ios/release/Lyrra ../build/ios/Payload/Lyrra.app/Lyrra || touch ../build/ios/Payload/Lyrra.app/Lyrra
           cp iosApp/Info.plist ../build/ios/Payload/Lyrra.app/
