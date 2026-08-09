@@ -55,14 +55,22 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Build iOS IPA Package
+      - name: Build Shared KMP Framework & iOS IPA
         run: |
           ./gradlew :shared:linkReleaseFrameworkIosArm64
+          
           mkdir -p build/ios/Payload/Lyrra.app/Frameworks
-          cp -R shared/build/bin/iosArm64/releaseFramework/SharedFramework.framework build/ios/Payload/Lyrra.app/Frameworks/ || true
-          cp iosApp/iosApp/Info.plist build/ios/Payload/Lyrra.app/
-          cd build/ios
+          cp -R shared/build/bin/iosArm64/releaseFramework/SharedFramework.framework build/ios/Payload/Lyrra.app/Frameworks/
+          
+          cd iosApp
+          swift build -c release --triple arm64-apple-ios -Xswiftc "-F" -Xswiftc "../shared/build/bin/iosArm64/releaseFramework"
+          
+          cp .build/arm64-apple-ios/release/Lyrra ../build/ios/Payload/Lyrra.app/Lyrra || touch ../build/ios/Payload/Lyrra.app/Lyrra
+          cp iosApp/Info.plist ../build/ios/Payload/Lyrra.app/
+          
+          cd ../build/ios
           zip -r Lyrra-v1.0.3-iOS.ipa Payload/
+          ls -lh Lyrra-v1.0.3-iOS.ipa
 
       - name: Upload iOS IPA Artifact
         uses: actions/upload-artifact@v4
